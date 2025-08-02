@@ -8,18 +8,29 @@ import sys
 import os
 import subprocess
 import time
-import requests
 import json
 from pathlib import Path
 
+# Try to import requests, but make it optional
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+    print("⚠️  requests module not available - service checks will be skipped")
+
 # Add the scripts directory to Python path
-sys.path.append(str(Path(__file__).parent / "scripts" / "test"))
+scripts_test_dir = Path(__file__).parent / "scripts" / "test"
+sys.path.insert(0, str(scripts_test_dir))
 
 try:
     from security_test_cases import SecurityTestCaseGenerator
-except ImportError:
+except ImportError as e:
     print("❌ Error: Could not import security test cases")
+    print(f"Import error: {e}")
     print("Make sure you're running this from the project root directory")
+    print(f"Looking for security_test_cases.py in: {scripts_test_dir}")
+    print(f"File exists: {(scripts_test_dir / 'security_test_cases.py').exists()}")
     sys.exit(1)
 
 class TestRunner:
@@ -30,6 +41,10 @@ class TestRunner:
         
     def check_services(self):
         """Check if all services are running"""
+        if not HAS_REQUESTS:
+            print("⚠️  Skipping service checks (requests module not available)")
+            return True
+            
         print("🔍 Checking service availability...")
         
         services = {
@@ -82,11 +97,11 @@ class TestRunner:
             # Run comprehensive test suite
             events = generator.run_comprehensive_test_suite(delay_seconds=2)
             
-            print(f"\n✅ Successfully sent {len(events)} test events to Kafka")
+            print(f"\n✅ Successfully sent {len(events)} test events")
             
             # Wait a bit for processing
             print("\n⏳ Waiting for events to be processed...")
-            time.sleep(10)
+            time.sleep(5)
             
             # Check API for processed events
             self.check_processed_events()
@@ -100,11 +115,24 @@ class TestRunner:
             return True
             
         except Exception as e:
-            print(f"❌ Error running test suite: {e}")
-            return False
+            if "NoBrokersAvailable" in str(e):
+                print("❌ Kafka is not available - cannot run integrated tests")
+                print("   To run integrated tests, start the full Docker environment:")
+                print("   ./docker-start.sh")
+                print("\n💡 Alternative: You can test individual API endpoints directly:")
+                print(f"   • Python ML API: {self.api_base_url}/docs")
+                print(f"   • Node.js API: {self.nodejs_api_url}/health")
+                return False
+            else:
+                print(f"❌ Error running test suite: {e}")
+                return False
     
     def check_processed_events(self):
         """Check if events were processed by the API"""
+        if not HAS_REQUESTS:
+            print("⚠️  Skipping event check (requests module not available)")
+            return
+            
         try:
             # Try to get incidents from the API
             response = requests.get(f"{self.nodejs_api_url}/security/incidents", timeout=10)

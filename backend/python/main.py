@@ -20,9 +20,9 @@ from api.routes import (
     incidents_router,
     ml_router,
     compliance_router,
-    threat_intel_router
+    threat_intel_router,
+    dashboard_router
 )
-from api.routes.dashboard import router as dashboard_router
 from api.middleware import SecurityMiddleware, LoggingMiddleware
 from api.services.database import DatabaseService
 from api.services.cache import CacheService

@@ -74,15 +74,38 @@ start_infrastructure() {
     
     # Wait for databases to be ready
     print_status "Waiting for databases to be ready..."
-    sleep 10
+    sleep 15
+    
+    # Check database connectivity
+    print_status "Checking database connectivity..."
+    for i in {1..30}; do
+        if docker compose exec -T postgres pg_isready -U postgres -d nodeguard > /dev/null 2>&1; then
+            print_success "Database is ready"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            print_error "Database failed to start properly"
+            docker compose logs postgres --tail=20
+            exit 1
+        fi
+        sleep 2
+    done
     
     # Start message queue
-    print_status "Starting message queue (Kafka)..."
-    docker compose up -d zookeeper kafka
+    print_status "Starting message queue (Zookeeper, Kafka)..."
+    docker compose up -d zookeeper
+    sleep 10
+    docker compose up -d kafka
     
     # Wait for Kafka to be ready
     print_status "Waiting for Kafka to be ready..."
-    sleep 15
+    sleep 20
+    
+    # Check Kafka status
+    if docker compose logs kafka --tail=5 | grep -q "FAILED"; then
+        print_warning "Kafka may have startup issues, checking logs..."
+        docker compose logs kafka --tail=10
+    fi
     
     # Start monitoring
     print_status "Starting monitoring (Prometheus, Grafana)..."
@@ -99,12 +122,42 @@ start_applications() {
     print_status "Starting Python ML API..."
     docker compose up -d python-api
     
+    # Wait and check Python API
+    sleep 10
+    if ! docker compose ps | grep -q "python-api.*Up"; then
+        print_warning "Python API may have issues, checking logs..."
+        docker compose logs python-api --tail=10
+    fi
+    
     print_status "Starting Node.js API..."
     docker compose up -d nodejs-api
+    
+    # Wait and check Node.js API
+    sleep 15
+    if ! docker compose ps | grep -q "nodejs-api.*Up"; then
+        print_error "Node.js API failed to start, checking logs..."
+        docker compose logs nodejs-api --tail=20
+        
+        # Check if it's a build issue
+        if docker compose logs nodejs-api --tail=20 | grep -q "Cannot find module.*dist/index.js"; then
+            print_error "TypeScript build failed. The dist/index.js file is missing."
+            print_status "Attempting to rebuild Node.js container..."
+            docker compose build --no-cache nodejs-api
+            docker compose up -d nodejs-api
+            sleep 10
+        fi
+    fi
     
     # Start frontend
     print_status "Starting React frontend..."
     docker compose up -d frontend
+    
+    # Wait and check frontend
+    sleep 10
+    if ! docker compose ps | grep -q "frontend.*Up"; then
+        print_warning "Frontend may have issues, checking logs..."
+        docker compose logs frontend --tail=10
+    fi
     
     print_success "Application services started"
 }

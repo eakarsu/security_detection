@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
 from datetime import datetime, timedelta
-from ..services.database import get_database_connection
+from ..services.database import DatabaseService
 
 logger = structlog.get_logger(__name__)
 
@@ -46,7 +46,10 @@ class TopThreat(BaseModel):
 async def get_dashboard_metrics() -> DashboardMetrics:
     """Get dashboard overview metrics"""
     try:
-        conn = await get_database_connection()
+        # Create database service instance
+        db = DatabaseService()
+        await db.initialize()
+        conn = await db.get_connection()
         
         # Get event counts by severity for today
         today = datetime.now().date()
@@ -135,7 +138,10 @@ async def get_dashboard_metrics() -> DashboardMetrics:
 async def get_event_trends(days: int = 7) -> List[EventTrend]:
     """Get event trends for the last N days"""
     try:
-        conn = await get_database_connection()
+        # Create database service instance
+        db = DatabaseService()
+        await db.initialize()
+        conn = await db.get_connection()
         
         # Get daily event counts for the last N days
         query = """
@@ -173,7 +179,10 @@ async def get_event_trends(days: int = 7) -> List[EventTrend]:
 async def get_top_threats(limit: int = 10) -> List[TopThreat]:
     """Get top threat types by frequency"""
     try:
-        conn = await get_database_connection()
+        # Create database service instance
+        db = DatabaseService()
+        await db.initialize()
+        conn = await db.get_connection()
         
         # Get top threat types from recent events
         query = """
@@ -213,7 +222,10 @@ async def get_top_threats(limit: int = 10) -> List[TopThreat]:
 async def get_recent_events(limit: int = 10) -> List[Dict[str, Any]]:
     """Get recent security events for dashboard"""
     try:
-        conn = await get_database_connection()
+        # Create database service instance
+        db = DatabaseService()
+        await db.initialize()
+        conn = await db.get_connection()
         
         query = """
             SELECT 
@@ -260,7 +272,10 @@ async def get_recent_events(limit: int = 10) -> List[Dict[str, Any]]:
 async def get_system_health() -> Dict[str, Any]:
     """Get system health metrics"""
     try:
-        conn = await get_database_connection()
+        # Create database service instance
+        db = DatabaseService()
+        await db.initialize()
+        conn = await db.get_connection()
         
         # Get database connection status
         db_status = "healthy"

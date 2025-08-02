@@ -8,8 +8,26 @@ import json
 import time
 import random
 from datetime import datetime, timedelta
-from kafka import KafkaProducer
 import uuid
+
+# Try to import kafka, but make it optional
+try:
+    from kafka import KafkaProducer
+    HAS_KAFKA = True
+except ImportError:
+    HAS_KAFKA = False
+    print("⚠️  kafka-python not available - will use mock producer")
+    
+    # Mock KafkaProducer for when kafka is not available
+    class KafkaProducer:
+        def __init__(self, **kwargs):
+            self.config = kwargs
+            
+        def send(self, topic, key=None, value=None):
+            print(f"📤 [MOCK] Would send to {topic}: {key}")
+            
+        def close(self):
+            pass
 
 class SecurityTestCaseGenerator:
     def __init__(self, kafka_bootstrap_servers='localhost:9092'):

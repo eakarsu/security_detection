@@ -24,8 +24,13 @@ EXCEPTION
         NULL;
 END $$;
 
--- Create the nodeguard user with the correct password
-CREATE USER nodeguard WITH PASSWORD 'NodeGuard2025!SecureDB';
+-- Create the nodeguard user with the correct password (if it doesn't exist)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'nodeguard') THEN
+        CREATE USER nodeguard WITH PASSWORD 'NodeGuard2025!SecureDB';
+    END IF;
+END $$;
 
 -- Grant necessary privileges
 ALTER USER nodeguard CREATEDB;
