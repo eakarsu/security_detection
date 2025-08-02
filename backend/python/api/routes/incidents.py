@@ -3,10 +3,12 @@ NodeGuard AI Security Platform - Incidents Routes
 Security incident management endpoints
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
+from datetime import datetime
+from ..services.database import get_database_connection
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +26,12 @@ class Incident(BaseModel):
     updated_at: str
     assigned_to: Optional[str] = None
     tags: List[str] = []
+    source_ip: Optional[str] = None
+    destination_ip: Optional[str] = None
+    user_id: Optional[str] = None
+    endpoint: Optional[str] = None
+    ml_score: Optional[float] = None
+    event_type: Optional[str] = None
 
 
 @router.get("/", response_model=List[Incident])
@@ -32,27 +40,81 @@ async def get_incidents(
     severity: Optional[str] = None,
     limit: int = 50
 ) -> List[Incident]:
-    """Get security incidents"""
+    """Get security incidents from database"""
     try:
-        # Mock data
-        incidents = [
-            Incident(
-                incident_id=f"inc_{i}",
-                title=f"Security Incident {i}",
-                description="Suspicious network activity detected",
-                severity="medium",
-                status="open",
-                created_at="2025-08-02T12:00:00Z",
-                updated_at="2025-08-02T12:00:00Z",
-                tags=["network", "suspicious"]
-            )
-            for i in range(1, min(limit + 1, 11))
-        ]
+        conn = await get_database_connection()
+        
+        # Build query with filters
+        query = """
+            SELECT 
+                id as incident_id,
+                event_type,
+                description,
+                severity,
+                status,
+                source_ip,
+                destination_ip,
+                user_id,
+                endpoint,
+                ml_score,
+                created_at,
+                updated_at,
+                assigned_to
+            FROM security.events
+            WHERE 1=1
+        """
+        params = []
         
         if status:
-            incidents = [i for i in incidents if i.status == status]
+            query += " AND status = $" + str(len(params) + 1)
+            params.append(status)
+            
         if severity:
-            incidents = [i for i in incidents if i.severity == severity]
+            query += " AND severity = $" + str(len(params) + 1)
+            params.append(severity)
+            
+        query += " ORDER BY created_at DESC LIMIT $" + str(len(params) + 1)
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
+        await conn.close()
+        
+        incidents = []
+        for row in rows:
+            # Create title based on event type and description
+            title = f"{row['event_type'].replace('_', ' ').title()}"
+            if row['user_id']:
+                title += f" - User: {row['user_id']}"
+            elif row['source_ip']:
+                title += f" - IP: {row['source_ip']}"
+                
+            # Extract tags from event type and other fields
+            tags = [row['event_type']]
+            if row['source_ip']:
+                tags.append("network")
+            if row['user_id']:
+                tags.append("user_activity")
+            if row['ml_score'] and row['ml_score'] > 0.8:
+                tags.append("high_confidence")
+                
+            incident = Incident(
+                incident_id=str(row['incident_id']),
+                title=title,
+                description=row['description'],
+                severity=row['severity'],
+                status=row['status'],
+                created_at=row['created_at'].isoformat() + 'Z',
+                updated_at=row['updated_at'].isoformat() + 'Z',
+                assigned_to=str(row['assigned_to']) if row['assigned_to'] else None,
+                tags=tags,
+                source_ip=str(row['source_ip']) if row['source_ip'] else None,
+                destination_ip=str(row['destination_ip']) if row['destination_ip'] else None,
+                user_id=row['user_id'],
+                endpoint=row['endpoint'],
+                ml_score=float(row['ml_score']) if row['ml_score'] else None,
+                event_type=row['event_type']
+            )
+            incidents.append(incident)
             
         return incidents
         

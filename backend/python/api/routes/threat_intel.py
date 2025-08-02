@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
-import random
+from ..services.database import get_database_connection
 
 logger = structlog.get_logger(__name__)
 
@@ -21,12 +21,13 @@ class ThreatIndicator(BaseModel):
     value: str
     threat_type: str
     severity: str
-    confidence: int
+    confidence: float
     source: str
     first_seen: str
     last_seen: str
     description: str
     tags: List[str] = []
+    is_active: bool = True
 
 
 class ThreatFeed(BaseModel):
@@ -49,56 +50,84 @@ async def get_threat_intelligence(
 ) -> Dict[str, Any]:
     """Get threat intelligence data including indicators and feeds"""
     try:
-        # Mock threat indicators
-        indicator_types = ['ip', 'domain', 'hash', 'url', 'email']
-        severities = ['low', 'medium', 'high', 'critical']
-        threat_types = ['malware', 'phishing', 'botnet', 'ransomware', 'apt', 'trojan']
-        sources = ['VirusTotal', 'MITRE ATT&CK', 'AlienVault OTX', 'Threat Crowd', 'Internal Analysis']
+        conn = await get_database_connection()
+        
+        # Build query with filters
+        query = """
+            SELECT 
+                id,
+                indicator_type,
+                indicator_value,
+                threat_type,
+                confidence_score,
+                source,
+                description,
+                first_seen,
+                last_seen,
+                is_active,
+                created_at
+            FROM security.threat_intel
+            WHERE is_active = true
+        """
+        params = []
+        
+        if type:
+            query += " AND indicator_type = $" + str(len(params) + 1)
+            params.append(type)
+            
+        if search:
+            query += " AND (indicator_value ILIKE $" + str(len(params) + 1) + " OR description ILIKE $" + str(len(params) + 2) + ")"
+            params.extend([f"%{search}%", f"%{search}%"])
+            
+        query += " ORDER BY confidence_score DESC, last_seen DESC LIMIT $" + str(len(params) + 1)
+        params.append(limit)
+        
+        rows = await conn.fetch(query, *params)
+        await conn.close()
         
         indicators = []
-        for i in range(1, min(limit + 1, 51)):
-            indicator_type = random.choice(indicator_types)
-            severity = random.choice(severities)
+        for row in rows:
+            # Map confidence score to severity
+            confidence = float(row['confidence_score'])
+            if confidence >= 0.9:
+                severity_level = "critical"
+            elif confidence >= 0.8:
+                severity_level = "high"
+            elif confidence >= 0.6:
+                severity_level = "medium"
+            else:
+                severity_level = "low"
             
-            # Generate realistic indicator values based on type
-            if indicator_type == 'ip':
-                value = f"{random.randint(1, 255)}.{random.randint(1, 255)}.{random.randint(1, 255)}.{random.randint(1, 255)}"
-            elif indicator_type == 'domain':
-                domains = ['malicious-site.com', 'phishing-bank.net', 'fake-update.org', 'suspicious-download.info']
-                value = random.choice(domains)
-            elif indicator_type == 'hash':
-                value = f"{''.join(random.choices('abcdef0123456789', k=64))}"
-            elif indicator_type == 'url':
-                urls = ['http://malicious-site.com/payload', 'https://phishing-bank.net/login', 'http://fake-update.org/download']
-                value = random.choice(urls)
-            else:  # email
-                emails = ['attacker@malicious.com', 'phisher@fake-bank.net', 'spam@suspicious.org']
-                value = random.choice(emails)
-            
+            # Generate tags based on threat type and indicator type
+            tags = [row['threat_type'], row['indicator_type']]
+            if row['indicator_type'] in ['ip', 'domain', 'url']:
+                tags.append("network")
+            elif row['indicator_type'] in ['hash']:
+                tags.append("file")
+            elif row['indicator_type'] in ['email']:
+                tags.append("email")
+                
             indicator = ThreatIndicator(
-                id=f"ioc_{i}",
-                type=indicator_type,
-                value=value,
-                threat_type=random.choice(threat_types),
-                severity=severity,
-                confidence=random.randint(60, 95),
-                source=random.choice(sources),
-                first_seen=f"2025-08-{random.randint(1, 2):02d}T{random.randint(8, 12):02d}:00:00Z",
-                last_seen=f"2025-08-02T{random.randint(10, 15):02d}:00:00Z",
-                description=f"Suspicious {indicator_type} associated with {random.choice(threat_types)} activity",
-                tags=[random.choice(threat_types), random.choice(['network', 'endpoint', 'web', 'email'])]
+                id=str(row['id']),
+                type=row['indicator_type'],
+                value=row['indicator_value'],
+                threat_type=row['threat_type'],
+                severity=severity_level,
+                confidence=confidence,
+                source=row['source'],
+                first_seen=row['first_seen'].isoformat() + 'Z' if row['first_seen'] else row['created_at'].isoformat() + 'Z',
+                last_seen=row['last_seen'].isoformat() + 'Z' if row['last_seen'] else row['created_at'].isoformat() + 'Z',
+                description=row['description'],
+                tags=tags,
+                is_active=row['is_active']
             )
             indicators.append(indicator)
         
-        # Apply filters
-        if type:
-            indicators = [i for i in indicators if i.type == type]
+        # Apply severity filter after mapping
         if severity:
             indicators = [i for i in indicators if i.severity == severity]
-        if search:
-            indicators = [i for i in indicators if search.lower() in i.value.lower() or search.lower() in i.description.lower()]
         
-        # Mock threat feeds
+        # Mock threat feeds (these could also come from database in the future)
         feeds = [
             ThreatFeed(
                 id="feed_1",
@@ -106,53 +135,44 @@ async def get_threat_intelligence(
                 source="VirusTotal",
                 status="active",
                 last_updated="2025-08-02T12:00:00Z",
-                indicators_count=15420,
+                indicators_count=len([i for i in indicators if i.source == "virustotal"]),
                 feed_type="commercial"
             ),
             ThreatFeed(
                 id="feed_2",
-                name="MITRE ATT&CK",
-                source="MITRE Corporation",
+                name="PhishTank",
+                source="PhishTank",
                 status="active",
                 last_updated="2025-08-02T11:30:00Z",
-                indicators_count=8934,
-                feed_type="open_source"
+                indicators_count=len([i for i in indicators if i.source == "phishtank"]),
+                feed_type="community"
             ),
             ThreatFeed(
                 id="feed_3",
-                name="AlienVault OTX",
-                source="AT&T Cybersecurity",
-                status="active",
-                last_updated="2025-08-02T11:45:00Z",
-                indicators_count=12567,
-                feed_type="community"
-            ),
-            ThreatFeed(
-                id="feed_4",
-                name="Threat Crowd",
-                source="Threat Crowd",
-                status="inactive",
-                last_updated="2025-08-01T18:00:00Z",
-                indicators_count=5432,
-                feed_type="community"
-            ),
-            ThreatFeed(
-                id="feed_5",
-                name="Internal Threat Intel",
+                name="Internal Detection",
                 source="NodeGuard Internal",
                 status="active",
-                last_updated="2025-08-02T13:00:00Z",
-                indicators_count=2341,
+                last_updated="2025-08-02T11:45:00Z",
+                indicators_count=len([i for i in indicators if i.source == "internal_detection"]),
                 feed_type="internal"
             ),
             ThreatFeed(
-                id="feed_6",
-                name="Emerging Threats",
-                source="Proofpoint",
-                status="error",
-                last_updated="2025-08-02T08:00:00Z",
-                indicators_count=9876,
+                id="feed_4",
+                name="Threat Feed",
+                source="External Feeds",
+                status="active",
+                last_updated="2025-08-02T13:00:00Z",
+                indicators_count=len([i for i in indicators if i.source == "threat_feed"]),
                 feed_type="commercial"
+            ),
+            ThreatFeed(
+                id="feed_5",
+                name="Manual Analysis",
+                source="Security Team",
+                status="active",
+                last_updated="2025-08-02T10:00:00Z",
+                indicators_count=len([i for i in indicators if i.source == "manual_analysis"]),
+                feed_type="internal"
             )
         ]
         
@@ -198,21 +218,68 @@ async def get_threat_feeds() -> List[ThreatFeed]:
 async def get_threat_indicator(indicator_id: str) -> ThreatIndicator:
     """Get specific threat indicator"""
     try:
-        # Mock detailed indicator
+        conn = await get_database_connection()
+        
+        query = """
+            SELECT 
+                id,
+                indicator_type,
+                indicator_value,
+                threat_type,
+                confidence_score,
+                source,
+                description,
+                first_seen,
+                last_seen,
+                is_active,
+                created_at
+            FROM security.threat_intel
+            WHERE id = $1
+        """
+        
+        row = await conn.fetchrow(query, indicator_id)
+        await conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Threat indicator not found")
+        
+        # Map confidence score to severity
+        confidence = float(row['confidence_score'])
+        if confidence >= 0.9:
+            severity_level = "critical"
+        elif confidence >= 0.8:
+            severity_level = "high"
+        elif confidence >= 0.6:
+            severity_level = "medium"
+        else:
+            severity_level = "low"
+        
+        # Generate tags based on threat type and indicator type
+        tags = [row['threat_type'], row['indicator_type']]
+        if row['indicator_type'] in ['ip', 'domain', 'url']:
+            tags.append("network")
+        elif row['indicator_type'] in ['hash']:
+            tags.append("file")
+        elif row['indicator_type'] in ['email']:
+            tags.append("email")
+            
         return ThreatIndicator(
-            id=indicator_id,
-            type="ip",
-            value="192.168.1.100",
-            threat_type="malware",
-            severity="high",
-            confidence=87,
-            source="VirusTotal",
-            first_seen="2025-08-01T10:00:00Z",
-            last_seen="2025-08-02T12:00:00Z",
-            description="IP address associated with known malware command and control infrastructure",
-            tags=["malware", "c2", "botnet", "network"]
+            id=str(row['id']),
+            type=row['indicator_type'],
+            value=row['indicator_value'],
+            threat_type=row['threat_type'],
+            severity=severity_level,
+            confidence=confidence,
+            source=row['source'],
+            first_seen=row['first_seen'].isoformat() + 'Z' if row['first_seen'] else row['created_at'].isoformat() + 'Z',
+            last_seen=row['last_seen'].isoformat() + 'Z' if row['last_seen'] else row['created_at'].isoformat() + 'Z',
+            description=row['description'],
+            tags=tags,
+            is_active=row['is_active']
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error retrieving threat indicator", error=str(e), indicator_id=indicator_id)
         raise HTTPException(status_code=500, detail="Failed to retrieve indicator")

@@ -86,10 +86,15 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False, env="DEBUG")
     ENABLE_SWAGGER: bool = Field(default=True, env="ENABLE_SWAGGER")
     ENABLE_CORS: bool = Field(default=True, env="ENABLE_CORS")
-    ALLOWED_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:3001"],
+    ALLOWED_ORIGINS: str = Field(
+        default="http://localhost:3000,http://localhost:3001",
         env="ALLOWED_ORIGINS"
     )
+    
+    @property
+    def ALLOWED_ORIGINS_LIST(self) -> List[str]:
+        """Parse comma-separated ALLOWED_ORIGINS into a list"""
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
     
     # ML Configuration
     ML_MODEL_PATH: str = Field(default="./models", env="ML_MODEL_PATH")
@@ -101,6 +106,8 @@ class Settings(BaseSettings):
     PROMETHEUS_ENABLED: bool = Field(default=True, env="PROMETHEUS_ENABLED")
     METRICS_PORT: int = Field(default=9090, env="METRICS_PORT")
     HEALTH_CHECK_INTERVAL: int = Field(default=30, env="HEALTH_CHECK_INTERVAL")
+    GRAFANA_PASSWORD: Optional[str] = Field(default=None, env="GRAFANA_PASSWORD")
+    PROMETHEUS_RETENTION: str = Field(default="15d", env="PROMETHEUS_RETENTION")
     
     # Threat Detection Configuration
     THREAT_SCORE_THRESHOLD: float = Field(default=0.7, env="THREAT_SCORE_THRESHOLD")

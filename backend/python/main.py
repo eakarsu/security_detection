@@ -22,6 +22,7 @@ from api.routes import (
     compliance_router,
     threat_intel_router
 )
+from api.routes.dashboard import router as dashboard_router
 from api.middleware import SecurityMiddleware, LoggingMiddleware
 from api.services.database import DatabaseService
 from api.services.cache import CacheService
@@ -166,6 +167,7 @@ app.include_router(incidents_router, prefix="/api/incidents", tags=["Incidents"]
 app.include_router(ml_router, prefix="/api/ml", tags=["Machine Learning"])
 app.include_router(compliance_router, prefix="/api/compliance", tags=["Compliance"])
 app.include_router(threat_intel_router, prefix="/api/threat-intel", tags=["Threat Intelligence"])
+app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
 
 
 @app.get("/")
