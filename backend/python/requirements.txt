@@ -1,0 +1,58 @@
+# Core FastAPI and web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# HTTP client for OpenRouter API
+httpx>=0.25.0
+
+# Logging
+structlog>=23.2.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Data processing (compatible versions for Python 3.12)
+pandas>=2.1.0
+numpy>=1.24.0
+
+# Machine Learning (compatible versions)
+scikit-learn>=1.3.0
+xgboost>=1.7.0
+
+# Optional: Database support (if needed later)
+# sqlalchemy>=2.0.0
+# psycopg2-binary>=2.9.0
+
+# Optional: Redis support (if needed later)
+# redis>=5.0.0
+
+# Monitoring and metrics
+prometheus-client>=0.19.0
+
+# Database support
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.13.0
+
+# Cache support
+redis>=5.0.0
+
+# Search support
+elasticsearch>=8.11.0
+
+# Message queue support
+kafka-python>=2.0.2
+
+# Security and authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+
+# File handling
+aiofiles>=23.2.0
+
+# Development and testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0

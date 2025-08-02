@@ -1,0 +1,85 @@
+{
+  "name": "nodeguard-frontend",
+  "version": "1.0.0",
+  "description": "NodeGuard AI Security Platform - Frontend",
+  "private": true,
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.68",
+    "@types/react": "^18.2.42",
+    "@types/react-dom": "^18.2.17",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "typescript": "^4.9.5",
+    "web-vitals": "^2.1.4",
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.15.0",
+    "@mui/icons-material": "^5.15.0",
+    "@mui/x-data-grid": "^6.18.2",
+    "@mui/x-charts": "^6.18.3",
+    "react-router-dom": "^6.20.1",
+    "axios": "^1.6.2",
+    "react-query": "^3.39.3",
+    "recharts": "^2.8.0",
+    "d3": "^7.8.5",
+    "@types/d3": "^7.4.3",
+    "svelvet": "^9.0.0",
+    "react-flow-renderer": "^10.3.17",
+    "reactflow": "^11.10.1",
+    "zustand": "^4.4.7",
+    "react-hook-form": "^7.48.2",
+    "react-hot-toast": "^2.4.1",
+    "date-fns": "^2.30.0",
+    "lodash": "^4.17.21",
+    "@types/lodash": "^4.14.202",
+    "react-helmet-async": "^2.0.4",
+    "react-syntax-highlighter": "^15.5.0",
+    "@types/react-syntax-highlighter": "^15.5.11",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "react-virtualized": "^9.22.5",
+    "@types/react-virtualized": "^9.21.29",
+    "framer-motion": "^10.16.16",
+    "react-beautiful-dnd": "^13.1.1",
+    "@types/react-beautiful-dnd": "^13.1.8"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/react-beautiful-dnd": "^13.1.8",
+    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1"
+  },
+  "proxy": "http://localhost:3001"
+}
