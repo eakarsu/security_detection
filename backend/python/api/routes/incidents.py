@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
 from datetime import datetime
-from ..services.database import get_database_connection
+from ..services.database import get_database_service
 
 logger = structlog.get_logger(__name__)
 
@@ -43,8 +43,10 @@ async def get_incidents(
 ) -> List[Incident]:
     """Get security incidents from database"""
     try:
-        # Use async context manager for database connection
-        async with await get_database_connection() as conn:
+        # Get database service and connection
+        db_service = await get_database_service()
+        await db_service.ensure_connected()
+        async with db_service.get_connection_context() as conn:
             # Build query with filters
             query = """
                 SELECT 

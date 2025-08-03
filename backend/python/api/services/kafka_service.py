@@ -21,6 +21,7 @@ class SecurityEventProcessor:
     def __init__(self, ml_service=None, database_service=None):
         self.ml_service = ml_service
         self.database_service = database_service
+        self._kafka_db_service = None
         
     async def process_security_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Process a security event through ML analysis"""
@@ -116,10 +117,18 @@ Event Details:
     async def store_security_event(self, event_data: Dict[str, Any]):
         """Store security event in database"""
         try:
-            from .database import get_database_connection
+            # Use dedicated database service for Kafka to avoid connection conflicts
+            if self._kafka_db_service is None:
+                from .database import DatabaseService
+                self._kafka_db_service = DatabaseService()
+                await self._kafka_db_service.initialize()
+            
+            # Ensure connection is available
+            if not self._kafka_db_service.is_connected():
+                await self._kafka_db_service.initialize()
             
             # Store event in security.events table
-            async with await get_database_connection() as conn:
+            async with self._kafka_db_service.get_connection_context() as conn:
                 # Map event data to database fields
                 event_type = event_data.get('threat_type', 'unknown')
                 description = event_data.get('description', f"{event_type} detected")
@@ -248,7 +257,8 @@ class KafkaService:
         self.consumer_thread = None
         self.running = False
         self.database_service = database_service
-        self.event_processor = SecurityEventProcessor(database_service=database_service)
+        # Create event processor with isolated database connection
+        self.event_processor = SecurityEventProcessor(database_service=None)  # Don't share database service
         self._connected = False
         
     async def initialize(self):

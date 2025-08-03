@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
-from ..services.database import get_database_connection
+from ..services.database import get_database_service
 
 logger = structlog.get_logger(__name__)
 
@@ -51,8 +51,10 @@ async def get_threat_intelligence(
 ) -> Dict[str, Any]:
     """Get threat intelligence data including indicators and feeds"""
     try:
-        # Use async context manager for database connection
-        async with await get_database_connection() as conn:
+        # Get database service and connection
+        db_service = await get_database_service()
+        await db_service.ensure_connected()
+        async with db_service.get_connection_context() as conn:
             # Build query with filters
             query = """
                 SELECT 
@@ -218,8 +220,10 @@ async def get_threat_feeds() -> List[ThreatFeed]:
 async def get_threat_indicator(indicator_id: str) -> ThreatIndicator:
     """Get specific threat indicator"""
     try:
-        # Use async context manager for database connection
-        async with await get_database_connection() as conn:
+        # Get database service and connection
+        db_service = await get_database_service()
+        await db_service.ensure_connected()
+        async with db_service.get_connection_context() as conn:
             query = """
                 SELECT 
                     id,

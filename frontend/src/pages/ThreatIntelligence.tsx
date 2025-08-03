@@ -46,6 +46,7 @@ import {
   Computer as ComputerIcon
 } from '@mui/icons-material';
 import LoadingSpinner from '../components/common/LoadingSpinner.tsx';
+import { ENDPOINTS } from '../config/api.ts';
 
 interface ThreatIndicator {
   id: string;
@@ -93,7 +94,7 @@ const ThreatIntelligence: React.FC = () => {
       if (filterSeverity) params.append('severity', filterSeverity);
       if (searchTerm) params.append('search', searchTerm);
       
-      const response = await fetch(`http://localhost:8000/api/threat-intel?${params}`);
+      const response = await fetch(`${ENDPOINTS.threatIntel()}?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch threat intelligence data');
       }
@@ -255,7 +256,7 @@ const ThreatIntelligence: React.FC = () => {
                     High Confidence
                   </Typography>
                   <Typography variant="h4" color="info.main">
-                    {indicators.filter(i => i.confidence >= 80).length}
+                    {indicators.filter(i => i.confidence >= 0.8).length}
                   </Typography>
                 </Box>
               </Box>
@@ -393,12 +394,12 @@ const ThreatIntelligence: React.FC = () => {
                   <Box display="flex" alignItems="center">
                     <LinearProgress
                       variant="determinate"
-                      value={indicator.confidence}
-                      color={getConfidenceColor(indicator.confidence) as any}
+                      value={indicator.confidence * 100}
+                      color={getConfidenceColor(indicator.confidence * 100) as any}
                       sx={{ width: 60, mr: 1 }}
                     />
                     <Typography variant="body2">
-                      {indicator.confidence}%
+                      {Math.round(indicator.confidence * 100)}%
                     </Typography>
                   </Box>
                 </TableCell>
@@ -475,7 +476,7 @@ const ThreatIntelligence: React.FC = () => {
                 <TextField
                   fullWidth
                   label="Confidence"
-                  value={`${selectedIndicator.confidence}%`}
+                  value={`${Math.round(selectedIndicator.confidence * 100)}%`}
                   disabled
                 />
               </Grid>

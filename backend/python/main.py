@@ -74,14 +74,19 @@ async def lifespan(app: FastAPI):
             if not LocalDevSettings.LOCAL_DEV_MODE:
                 raise
         
-        try:
-            kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS, database_service=db_service)
-            await kafka_service.initialize()
-            logger.info("Kafka service initialized")
-        except Exception as e:
-            logger.warning("Kafka service failed to initialize", error=str(e))
-            if not LocalDevSettings.LOCAL_DEV_MODE:
-                raise
+        # Only initialize Kafka if external services are enabled
+        if not LocalDevSettings.DISABLE_EXTERNAL_SERVICES:
+            try:
+                kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS, database_service=db_service)
+                await kafka_service.initialize()
+                logger.info("Kafka service initialized")
+            except Exception as e:
+                logger.warning("Kafka service failed to initialize", error=str(e))
+                if not LocalDevSettings.LOCAL_DEV_MODE:
+                    raise
+        else:
+            logger.info("Kafka service disabled (external services disabled for local development)")
+            kafka_service = None
         
         try:
             ml_service = MLService()

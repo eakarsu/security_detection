@@ -1,7 +1,25 @@
 #!/bin/bash
 
-# NodeGuard AI Security Platform - Optimized Local Development
-# This script starts infrastructure services and applications with improved performance
+# NodeGuard AI Security Platform - Local Development Mode
+# 
+# ARCHITECTURE OVERVIEW:
+# This script runs a HYBRID setup for local development:
+# - Infrastructure services (PostgreSQL, Kafka, Redis, etc.) run in Docker containers
+# - Application services (Frontend, APIs) run as LOCAL processes for faster development
+#
+# COMPARISON WITH OTHER SCRIPTS:
+# - docker-start.sh: Everything runs in Docker containers (production-like)
+# - start-local.sh: Infrastructure in Docker + Applications as local processes (development)
+#
+# PORT CONFLICT RESOLUTION:
+# If Docker containers are already running on ports 3000, 3001, 8000, this script will:
+# 1. Stop the conflicting application Docker containers
+# 2. Keep infrastructure containers running (PostgreSQL, Kafka, etc.)
+# 3. Start local processes on the freed ports
+#
+# This gives you the best of both worlds:
+# - Fast development with hot-reload (local processes)
+# - Full infrastructure integration (Docker containers)
 
 set -e
 
@@ -105,41 +123,93 @@ check_dependencies() {
     print_success "All dependencies found"
 }
 
-# Clean up any existing processes on our ports
+# Clean up any existing processes on our LOCAL DEVELOPMENT ports
 cleanup_ports() {
-    print_status "Cleaning up any existing processes on ports 3000, 3001, 8000..."
+    # Load environment variables from .env file
+    source .env
     
-    # Kill processes on our ports (but preserve database services)
-    for port in 3000 3001 8000; do
+    print_status "Cleaning up any existing processes on LOCAL DEV ports $LOCAL_FRONTEND_PORT, $LOCAL_API_PORT, $LOCAL_PYTHON_API_PORT..."
+    print_status "Note: Docker containers can continue running on ports $FRONTEND_PORT, $API_PORT, $PYTHON_API_PORT without conflict"
+    
+    # Kill any processes on our local development ports
+    for port in $LOCAL_FRONTEND_PORT $LOCAL_API_PORT $LOCAL_PYTHON_API_PORT; do
         if lsof -ti:$port >/dev/null 2>&1; then
             local process=$(lsof -ti:$port | head -1)
             local process_name=$(ps -p $process -o comm= 2>/dev/null || echo "unknown")
             
-            # Don't kill database services
-            if [[ "$process_name" != *"postgres"* ]] && [[ "$process_name" != *"redis"* ]] && [[ "$process_name" != *"docker"* ]]; then
-                lsof -ti:$port | xargs kill -9 2>/dev/null || true
-            fi
+            print_status "Killing process $process_name on port $port"
+            lsof -ti:$port | xargs kill -9 2>/dev/null || true
         fi
     done
     
-    print_success "Ports cleaned up"
+    print_success "Local development ports cleaned up - No conflicts with Docker containers"
 }
 
-# Start minimal infrastructure (only PostgreSQL)
+# Start infrastructure based on LOCAL_DEV_MODE setting
 start_infrastructure() {
-    print_status "Starting minimal infrastructure (PostgreSQL only)..."
+    # Load LOCAL_DEV_MODE from .env
+    source .env
+    local_dev_mode=${LOCAL_DEV_MODE:-true}
     
-    # Check if PostgreSQL container is running
-    if ! docker ps | grep -q "security_detection-postgres-1"; then
-        print_status "Starting PostgreSQL container..."
+    if [ "$local_dev_mode" = "true" ]; then
+        print_status "Starting minimal infrastructure (PostgreSQL only) - LOCAL_DEV_MODE=true"
+        
+        # Check if PostgreSQL container is running
+        if ! docker ps | grep -q "security_detection-postgres-1"; then
+            print_status "Starting PostgreSQL container..."
+            docker-compose up -d postgres
+            sleep 3
+            print_success "PostgreSQL container started"
+        else
+            print_success "PostgreSQL container already running"
+        fi
+        
+        print_success "Minimal infrastructure ready"
+    else
+        print_status "Starting FULL infrastructure (PostgreSQL, Redis, Kafka, Elasticsearch) - LOCAL_DEV_MODE=false"
+        
+        # Start all infrastructure services for full integration
+        print_status "Starting Zookeeper..."
+        docker-compose up -d zookeeper
+        sleep 5
+        
+        print_status "Starting Kafka..."
+        docker-compose up -d kafka
+        sleep 10
+        
+        print_status "Starting PostgreSQL..."
         docker-compose up -d postgres
         sleep 3
-        print_success "PostgreSQL container started"
-    else
-        print_success "PostgreSQL container already running"
+        
+        print_status "Starting Redis..."
+        docker-compose up -d redis
+        sleep 2
+        
+        print_status "Starting Elasticsearch..."
+        docker-compose up -d elasticsearch
+        sleep 5
+        
+        print_success "Full infrastructure ready for integration testing"
+        
+        # Wait for Kafka to be fully ready
+        print_status "Waiting for Kafka to be ready..."
+        local kafka_ready=false
+        local attempts=0
+        while [ $attempts -lt 30 ] && [ "$kafka_ready" = false ]; do
+            if docker exec security_detection-kafka-1 kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+                kafka_ready=true
+                print_success "Kafka is ready"
+            else
+                print_status "Waiting for Kafka... ($attempts/30)"
+                sleep 2
+                attempts=$((attempts + 1))
+            fi
+        done
+        
+        if [ "$kafka_ready" = false ]; then
+            print_warning "Kafka may not be fully ready, but continuing..."
+        fi
     fi
-    
-    print_success "Minimal infrastructure ready"
     
     # List all running Docker containers
     print_status "Currently running Docker containers:"
@@ -147,6 +217,9 @@ start_infrastructure() {
 }
 # Test API endpoints and display comprehensive status
 show_info() {
+    # Load environment variables from .env file
+    source .env
+    
     echo ""
     echo "=================================================="
     echo -e "${GREEN}NodeGuard AI Security Platform - Status Report${NC}"
@@ -156,67 +229,106 @@ show_info() {
     # Test API endpoints
     print_status "Testing API endpoints..."
     
-    # Test Python API
-    if curl -s http://localhost:8000/health > /dev/null 2>&1; then
-        print_success "Python ML API (port 8000) - WORKING"
+    # Test Python API (local dev port)
+    if curl -s http://localhost:$LOCAL_PYTHON_API_PORT/health > /dev/null 2>&1; then
+        print_success "Python ML API (port $LOCAL_PYTHON_API_PORT) - WORKING"
         # Test specific endpoints that were failing
-        if curl -s http://localhost:8000/api/incidents/ > /dev/null 2>&1; then
+        if curl -s http://localhost:$LOCAL_PYTHON_API_PORT/api/incidents/ > /dev/null 2>&1; then
             print_success "  ✓ /api/incidents/ endpoint - WORKING"
         else
             print_error "  ✗ /api/incidents/ endpoint - FAILED"
         fi
         
-        if curl -s http://localhost:8000/api/threat-intel/ > /dev/null 2>&1; then
+        if curl -s http://localhost:$LOCAL_PYTHON_API_PORT/api/threat-intel/ > /dev/null 2>&1; then
             print_success "  ✓ /api/threat-intel/ endpoint - WORKING"
         else
             print_error "  ✗ /api/threat-intel/ endpoint - FAILED"
         fi
     else
-        print_error "Python ML API (port 8000) - NOT RESPONDING"
+        print_error "Python ML API (port $LOCAL_PYTHON_API_PORT) - NOT RESPONDING"
     fi
     
-    # Test Node.js API
-    if curl -s http://localhost:3001/health > /dev/null 2>&1; then
-        print_success "Node.js API (port 3001) - WORKING"
+    # Test Node.js API (local dev port)
+    if curl -s http://localhost:$LOCAL_API_PORT/health > /dev/null 2>&1; then
+        print_success "Node.js API (port $LOCAL_API_PORT) - WORKING"
     else
-        print_warning "Node.js API (port 3001) - NOT RESPONDING"
+        print_warning "Node.js API (port $LOCAL_API_PORT) - NOT RESPONDING"
     fi
     
-    # Test Frontend
-    if curl -s http://localhost:3000 > /dev/null 2>&1; then
-        print_success "Frontend (port 3000) - WORKING"
+    # Test Frontend (local dev port)
+    if curl -s http://localhost:$LOCAL_FRONTEND_PORT > /dev/null 2>&1; then
+        print_success "Frontend (port $LOCAL_FRONTEND_PORT) - WORKING"
     else
-        print_warning "Frontend (port 3000) - NOT RESPONDING"
+        print_warning "Frontend (port $LOCAL_FRONTEND_PORT) - NOT RESPONDING"
     fi
     
     echo ""
     echo "🐳 Docker Containers:"
     docker ps --format "   {{.Names}} ({{.Image}}) - {{.Status}}" | grep security_detection || echo "   No security_detection containers running"
     
+    # Load LOCAL_DEV_MODE to show appropriate status
+    source .env
+    local_dev_mode=${LOCAL_DEV_MODE:-true}
+    
     echo ""
-    echo "🔍 Kafka Status:"
-    if docker ps | grep -q kafka; then
-        print_success "   Kafka container is running"
+    echo "🔍 Integration Mode Status:"
+    if [ "$local_dev_mode" = "true" ]; then
+        print_warning "   LOCAL_DEV_MODE=true - Minimal infrastructure (PostgreSQL only)"
+        print_status "   Kafka connection errors in logs are EXPECTED and harmless"
+        if docker ps | grep -q kafka; then
+            print_success "   Kafka container is running"
+        else
+            print_status "   Kafka is NOT running (normal for local dev mode)"
+        fi
     else
-        print_warning "   Kafka is NOT running (this is NORMAL for minimal local development)"
-        print_status "   Kafka connection errors in logs are expected and harmless"
+        print_success "   LOCAL_DEV_MODE=false - FULL INTEGRATION MODE"
+        if docker ps | grep -q kafka; then
+            print_success "   ✅ Kafka container is running - Full integration enabled!"
+        else
+            print_error "   ❌ Kafka container not running - Integration tests will fail"
+        fi
+        if docker ps | grep -q redis; then
+            print_success "   ✅ Redis container is running"
+        else
+            print_warning "   ⚠️  Redis container not running"
+        fi
+        if docker ps | grep -q elasticsearch; then
+            print_success "   ✅ Elasticsearch container is running"
+        else
+            print_warning "   ⚠️  Elasticsearch container not running"
+        fi
     fi
     
     echo ""
-    echo "🌐 Application URLs:"
-    echo "   Frontend:           http://localhost:3000"
-    echo "   Node.js API:        http://localhost:3001"
-    echo "   Python ML API:      http://localhost:8000"
-    echo "   API Documentation:  http://localhost:8000/docs"
+    echo "🌐 Application URLs (LOCAL DEVELOPMENT):"
+    echo "   Frontend:           http://localhost:$LOCAL_FRONTEND_PORT"
+    echo "   Node.js API:        http://localhost:$LOCAL_API_PORT"
+    echo "   Python ML API:      http://localhost:$LOCAL_PYTHON_API_PORT"
+    echo "   API Documentation:  http://localhost:$LOCAL_PYTHON_API_PORT/docs"
+    echo ""
+    echo "🐳 Docker Container URLs (if running):"
+    echo "   Frontend:           http://localhost:$FRONTEND_PORT"
+    echo "   Node.js API:        http://localhost:$API_PORT"
+    echo "   Python ML API:      http://localhost:$PYTHON_API_PORT"
     echo ""
     echo "🔧 Infrastructure Services:"
     echo "   PostgreSQL:         localhost:5432 (nodeguard/NodeGuard2025!SecureDB)"
+    if [ "$local_dev_mode" = "false" ]; then
+        echo "   Redis:              localhost:6379"
+        echo "   Kafka:              localhost:9092"
+        echo "   Elasticsearch:      localhost:9200"
+    fi
     echo ""
     echo "📝 Logs:"
     echo "   Frontend:           tail -f logs/frontend.log"
     echo "   Node.js API:        tail -f logs/nodejs-api.log"
     echo "   Python ML API:      tail -f logs/python-api.log"
     echo "   PostgreSQL:         docker logs security_detection-postgres-1"
+    if [ "$local_dev_mode" = "false" ]; then
+        echo "   Kafka:              docker logs security_detection-kafka-1"
+        echo "   Redis:              docker logs security_detection-redis-1"
+        echo "   Elasticsearch:      docker logs security_detection-elasticsearch-1"
+    fi
     echo ""
     echo "🔧 Management:"
     echo "   Stop all services:  ./stop-local.sh"
@@ -230,17 +342,40 @@ show_info() {
     echo "   - Incident management"
     echo "   - Threat intelligence"
     echo "   - Workflow automation"
+    if [ "$local_dev_mode" = "false" ]; then
+        echo "   - 🔥 FULL KAFKA INTEGRATION - Real-time event processing"
+        echo "   - 🔥 REDIS CACHING - Enhanced performance"
+        echo "   - 🔥 ELASTICSEARCH - Advanced search and analytics"
+    fi
+    echo ""
+    echo "🧪 Testing:"
+    echo "   Run security tests: python3 run_security_tests.py"
+    if [ "$local_dev_mode" = "false" ]; then
+        echo "   🔥 FULL INTEGRATION TESTS ENABLED - Kafka pipeline testing included!"
+    else
+        echo "   ℹ️  Minimal tests only - set LOCAL_DEV_MODE=false for full integration"
+    fi
     echo ""
     echo "ℹ️  Important Notes:"
-    echo "   - This is a minimal local development setup with only PostgreSQL"
-    echo "   - Kafka connection errors in Python API logs are EXPECTED and harmless"
+    if [ "$local_dev_mode" = "true" ]; then
+        echo "   - This is a minimal local development setup with only PostgreSQL"
+        echo "   - Kafka connection errors in Python API logs are EXPECTED and harmless"
+        echo "   - For full infrastructure testing, set LOCAL_DEV_MODE=false in .env"
+    else
+        echo "   - This is FULL INTEGRATION MODE with all services running"
+        echo "   - Kafka integration is ENABLED - events will be processed in real-time"
+        echo "   - All security test cases will run through the complete pipeline"
+    fi
     echo "   - APIs are working correctly - any frontend 500 errors may be CORS related"
-    echo "   - For full infrastructure (Redis, Kafka, etc.), use docker-start.sh"
     echo ""
     echo "🚨 Troubleshooting:"
     echo "   - If frontend shows 500 errors, check browser console for CORS issues"
     echo "   - APIs can be tested directly: curl http://localhost:8000/api/incidents/"
     echo "   - Database has sample data loaded and ready"
+    if [ "$local_dev_mode" = "false" ]; then
+        echo "   - If Kafka tests fail, check: docker logs security_detection-kafka-1"
+        echo "   - Kafka topics: docker exec security_detection-kafka-1 kafka-topics --list --bootstrap-server localhost:9092"
+    fi
     echo ""
     echo "=================================================="
 }
@@ -295,9 +430,12 @@ init_database() {
     fi
 }
 
-# Start Python ML API with proper environment
+# Start Python ML API with proper environment on LOCAL DEV PORT
 start_python_api() {
-    print_status "Starting Python ML API on port 8000..."
+    # Load environment variables from .env file
+    source .env
+    
+    print_status "Starting Python ML API on LOCAL DEV port $LOCAL_PYTHON_API_PORT..."
     
     cd backend/python
     source venv/bin/activate
@@ -309,11 +447,11 @@ start_python_api() {
     
     # Override with local development settings using .env values
     export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
-    export ALLOWED_ORIGINS="http://localhost:3000,http://localhost:3001"
+    export ALLOWED_ORIGINS="http://localhost:${LOCAL_FRONTEND_PORT},http://localhost:${LOCAL_API_PORT}"
     export NODE_ENV="development"
     
-    # Start the Python API in background
-    nohup uvicorn main:app --reload --host 0.0.0.0 --port 8000 > ../../logs/python-api.log 2>&1 &
+    # Start the Python API in background on local dev port
+    nohup uvicorn main:app --reload --host 0.0.0.0 --port $LOCAL_PYTHON_API_PORT > ../../logs/python-api.log 2>&1 &
     PYTHON_PID=$!
     echo $PYTHON_PID > ../../logs/python-api.pid
     
@@ -321,16 +459,19 @@ start_python_api() {
     
     # Quick health check
     sleep 3
-    if curl -s http://localhost:8000/health > /dev/null; then
-        print_success "Python ML API started successfully (PID: $PYTHON_PID)"
+    if curl -s http://localhost:$LOCAL_PYTHON_API_PORT/health > /dev/null; then
+        print_success "Python ML API started successfully on port $LOCAL_PYTHON_API_PORT (PID: $PYTHON_PID)"
     else
         print_warning "Python ML API may still be starting. Check logs/python-api.log"
     fi
 }
 
-# Start Node.js API with proper environment
+# Start Node.js API with proper environment on LOCAL DEV PORT
 start_nodejs_api() {
-    print_status "Starting Node.js API on port 3001..."
+    # Load environment variables from .env file
+    source .env
+    
+    print_status "Starting Node.js API on LOCAL DEV port $LOCAL_API_PORT..."
     
     cd backend/nodejs
     
@@ -342,8 +483,9 @@ start_nodejs_api() {
     # Override with local development settings using .env values
     export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
     export NODE_ENV="development"
+    export PORT=$LOCAL_API_PORT
     
-    # Start the Node.js API in background
+    # Start the Node.js API in background on local dev port
     nohup npm run start:dev > ../../logs/nodejs-api.log 2>&1 &
     NODEJS_PID=$!
     echo $NODEJS_PID > ../../logs/nodejs-api.pid
@@ -352,25 +494,35 @@ start_nodejs_api() {
     
     # Quick health check
     sleep 5
-    if curl -s http://localhost:3001/health > /dev/null; then
-        print_success "Node.js API started successfully (PID: $NODEJS_PID)"
+    if curl -s http://localhost:$LOCAL_API_PORT/health > /dev/null; then
+        print_success "Node.js API started successfully on port $LOCAL_API_PORT (PID: $NODEJS_PID)"
     else
         print_warning "Node.js API may still be starting. Check logs/nodejs-api.log"
     fi
 }
 
-# Start React frontend
+# Start React frontend on LOCAL DEV PORT
 start_frontend() {
-    print_status "Starting React frontend on port 3000..."
+    # Load environment variables from .env file
+    source .env
+    
+    print_status "Starting React frontend on LOCAL DEV port $LOCAL_FRONTEND_PORT..."
     
     cd frontend
     
-    # Set environment variables for local development
-    export REACT_APP_API_URL="http://localhost:3001"
-    export REACT_APP_PYTHON_API_URL="http://localhost:8000"
-    export REACT_APP_ENV="development"
+    # Load environment variables from .env file
+    set -a
+    source ../.env
+    set +a
     
-    # Start the React frontend in background
+    # Set React environment variables for local development with local dev ports
+    export REACT_APP_API_URL="http://localhost:${LOCAL_API_PORT}"
+    export REACT_APP_PYTHON_API_URL="http://localhost:${LOCAL_PYTHON_API_PORT}"
+    export REACT_APP_LOCAL_DEV_MODE="true"
+    export REACT_APP_ENV="development"
+    export PORT=$LOCAL_FRONTEND_PORT
+    
+    # Start the React frontend in background on local dev port
     nohup npm start > ../logs/frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo $FRONTEND_PID > ../logs/frontend.pid
@@ -379,8 +531,8 @@ start_frontend() {
     
     # Quick health check
     sleep 10
-    if curl -s http://localhost:3000 > /dev/null; then
-        print_success "React frontend started successfully (PID: $FRONTEND_PID)"
+    if curl -s http://localhost:$LOCAL_FRONTEND_PORT > /dev/null; then
+        print_success "React frontend started successfully on port $LOCAL_FRONTEND_PORT (PID: $FRONTEND_PID)"
     else
         print_warning "React frontend may still be starting. Check logs/frontend.log"
     fi

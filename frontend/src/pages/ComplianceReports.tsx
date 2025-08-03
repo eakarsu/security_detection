@@ -59,6 +59,7 @@ import {
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
 import LoadingSpinner from '../components/common/LoadingSpinner.tsx';
+import { ENDPOINTS } from '../config/api.ts';
 
 interface ComplianceReport {
   id: string;
@@ -126,7 +127,7 @@ const ComplianceReports: React.FC = () => {
       if (filterFramework) params.append('framework', filterFramework);
       if (filterStatus) params.append('status', filterStatus);
       
-      const response = await fetch(`http://localhost:8000/api/compliance?${params}`);
+      const response = await fetch(`${ENDPOINTS.compliance()}?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch compliance data');
       }
@@ -183,7 +184,7 @@ const ComplianceReports: React.FC = () => {
 
   const handleCreateReport = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/compliance/reports', {
+      const response = await fetch(`${ENDPOINTS.compliance()}/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -223,7 +224,7 @@ const ComplianceReports: React.FC = () => {
 
   const handleDownloadReport = async (reportId: string) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/compliance/reports/${reportId}/download`);
+      const response = await fetch(`${ENDPOINTS.compliance()}/reports/${reportId}/download`);
       if (!response.ok) {
         throw new Error('Failed to download report');
       }
@@ -514,13 +515,15 @@ const ComplianceReports: React.FC = () => {
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Download Report">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleDownloadReport(report.id)}
-                      disabled={report.status !== 'completed'}
-                    >
-                      <DownloadIcon />
-                    </IconButton>
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDownloadReport(report.id)}
+                        disabled={report.status !== 'completed'}
+                      >
+                        <DownloadIcon />
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 </TableCell>
               </TableRow>

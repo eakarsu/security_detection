@@ -42,6 +42,7 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 import LoadingSpinner from '../components/common/LoadingSpinner.tsx';
+import { ENDPOINTS } from '../config/api.ts';
 
 interface Incident {
   incident_id: string;
@@ -84,7 +85,7 @@ const IncidentManagement: React.FC = () => {
       if (filterStatus) params.append('status', filterStatus);
       if (filterSeverity) params.append('severity', filterSeverity);
       
-      const response = await fetch(`http://localhost:8000/api/incidents?${params}`);
+      const response = await fetch(`${ENDPOINTS.incidents()}?${params}`);
       if (!response.ok) {
         throw new Error('Failed to fetch incidents');
       }
@@ -161,8 +162,8 @@ const IncidentManagement: React.FC = () => {
     try {
       const method = dialogMode === 'create' ? 'POST' : 'PUT';
       const url = dialogMode === 'create' 
-        ? 'http://localhost:8000/api/incidents'
-        : `http://localhost:8000/api/incidents/${selectedIncident?.incident_id}`;
+        ? ENDPOINTS.incidents()
+        : `${ENDPOINTS.incidents()}/${selectedIncident?.incident_id}`;
 
       const response = await fetch(url, {
         method,

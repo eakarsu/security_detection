@@ -162,27 +162,9 @@ class LocalDevSettings:
     @classmethod
     def get_effective_settings(cls):
         """Get settings adjusted for local development mode"""
-        if not cls.LOCAL_DEV_MODE:
-            return settings
-            
-        # Create a copy of settings with local dev overrides
-        local_settings = settings.copy()
-        
-        # Override database settings for local dev
-        if cls.USE_IN_MEMORY_DB:
-            local_settings.DATABASE_URL = "sqlite:///:memory:"
-            
-        # Override cache settings
-        if cls.USE_IN_MEMORY_CACHE:
-            local_settings.REDIS_URL = "memory://"
-            
-        # Disable external services
-        if cls.DISABLE_EXTERNAL_SERVICES:
-            local_settings.ELASTICSEARCH_URL = None
-            local_settings.KAFKA_BOOTSTRAP_SERVERS = None
-            local_settings.PROMETHEUS_ENABLED = False
-            
-        return local_settings
+        # For now, just return the original settings
+        # Local dev mode is handled in the application logic
+        return settings
 
 
 # Get effective settings based on mode
