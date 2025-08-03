@@ -34,6 +34,7 @@ class Incident(BaseModel):
     event_type: Optional[str] = None
 
 
+@router.get("", response_model=List[Incident])
 @router.get("/", response_model=List[Incident])
 async def get_incidents(
     status: Optional[str] = None,

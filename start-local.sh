@@ -309,7 +309,8 @@ start_python_api() {
     
     # Override with local development settings using .env values
     export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
-    export ALLOWED_ORIGINS='["http://localhost:3000", "http://localhost:3001"]'
+    export ALLOWED_ORIGINS="http://localhost:3000,http://localhost:3001"
+    export NODE_ENV="development"
     
     # Start the Python API in background
     nohup uvicorn main:app --reload --host 0.0.0.0 --port 8000 > ../../logs/python-api.log 2>&1 &

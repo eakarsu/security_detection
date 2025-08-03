@@ -41,6 +41,7 @@ class ThreatFeed(BaseModel):
     feed_type: str
 
 
+@router.get("", response_model=Dict[str, Any])
 @router.get("/", response_model=Dict[str, Any])
 async def get_threat_intelligence(
     type: Optional[str] = None,

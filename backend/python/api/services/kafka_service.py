@@ -86,9 +86,8 @@ class SecurityEventProcessor:
             "metadata": event_data.get('metadata', {})
         }
         
-        # Store incident in database if available
-        if self.database_service:
-            await self.database_service.create_incident(incident)
+        # Note: Incident is already stored as an event in security.events table
+        # via store_security_event method, so no additional storage needed
         
         return incident
     
@@ -117,22 +116,139 @@ Event Details:
     async def store_security_event(self, event_data: Dict[str, Any]):
         """Store security event in database"""
         try:
-            # This would store in PostgreSQL/Elasticsearch
-            logger.debug("Storing security event", event_id=event_data.get('event_id'))
+            from .database import get_database_connection
+            
+            # Store event in security.events table
+            async with await get_database_connection() as conn:
+                # Map event data to database fields
+                event_type = event_data.get('threat_type', 'unknown')
+                description = event_data.get('description', f"{event_type} detected")
+                severity = self._map_risk_to_severity(event_data.get('risk_score', 0.0))
+                status = 'open' if event_data.get('risk_score', 0.0) >= 7.0 else 'investigating'
+                
+                # Insert into security.events table
+                query = """
+                    INSERT INTO security.events (
+                        event_type, description, severity, status,
+                        source_ip, destination_ip, user_id, endpoint,
+                        ml_score, created_at, updated_at, assigned_to
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), $10)
+                    RETURNING id
+                """
+                
+                event_id = await conn.fetchval(
+                    query,
+                    event_type,
+                    description,
+                    severity,
+                    status,
+                    event_data.get('source_ip'),
+                    event_data.get('target_ip'),
+                    event_data.get('user_id'),
+                    event_data.get('endpoint'),
+                    event_data.get('risk_score'),
+                    None  # assigned_to
+                )
+                
+                logger.info("Stored security event in database", 
+                           event_id=event_id, 
+                           threat_type=event_type,
+                           risk_score=event_data.get('risk_score'))
+                
+                # Also store threat intelligence if it's a high-confidence threat
+                if event_data.get('risk_score', 0.0) >= 8.0:
+                    await self._store_threat_intelligence(conn, event_data)
+                
         except Exception as e:
             logger.error("Failed to store security event", error=str(e))
+    
+    def _map_risk_to_severity(self, risk_score: float) -> str:
+        """Map risk score to severity level"""
+        if risk_score >= 9.0:
+            return 'critical'
+        elif risk_score >= 7.0:
+            return 'high'
+        elif risk_score >= 5.0:
+            return 'medium'
+        else:
+            return 'low'
+    
+    async def _store_threat_intelligence(self, conn, event_data: Dict[str, Any]):
+        """Store threat intelligence indicators"""
+        try:
+            # Extract indicators from event data
+            indicators = []
+            
+            # IP indicators
+            if event_data.get('source_ip'):
+                indicators.append({
+                    'type': 'ip',
+                    'value': event_data['source_ip'],
+                    'threat_type': event_data.get('threat_type', 'unknown'),
+                    'confidence': event_data.get('risk_score', 0.0) / 10.0
+                })
+            
+            # Domain indicators (if available)
+            if event_data.get('domain'):
+                indicators.append({
+                    'type': 'domain',
+                    'value': event_data['domain'],
+                    'threat_type': event_data.get('threat_type', 'unknown'),
+                    'confidence': event_data.get('risk_score', 0.0) / 10.0
+                })
+            
+            # Hash indicators (if available)
+            if event_data.get('file_hash'):
+                indicators.append({
+                    'type': 'hash',
+                    'value': event_data['file_hash'],
+                    'threat_type': event_data.get('threat_type', 'unknown'),
+                    'confidence': event_data.get('risk_score', 0.0) / 10.0
+                })
+            
+            # Store each indicator
+            for indicator in indicators:
+                query = """
+                    INSERT INTO security.threat_intel (
+                        indicator_type, indicator_value, threat_type,
+                        confidence_score, source, description,
+                        first_seen, last_seen, is_active, created_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), true, NOW())
+                    ON CONFLICT (indicator_value, indicator_type) 
+                    DO UPDATE SET 
+                        last_seen = NOW(),
+                        confidence_score = GREATEST(security.threat_intel.confidence_score, $4)
+                """
+                
+                await conn.execute(
+                    query,
+                    indicator['type'],
+                    indicator['value'],
+                    indicator['threat_type'],
+                    indicator['confidence'],
+                    'kafka_events',
+                    f"{indicator['threat_type']} indicator from security event"
+                )
+                
+                logger.debug("Stored threat intelligence indicator",
+                           type=indicator['type'],
+                           value=indicator['value'][:20] + "..." if len(indicator['value']) > 20 else indicator['value'])
+                
+        except Exception as e:
+            logger.error("Failed to store threat intelligence", error=str(e))
 
 
 class KafkaService:
     """Enhanced Kafka service for real-time security event processing"""
     
-    def __init__(self, bootstrap_servers: str = "localhost:9092"):
+    def __init__(self, bootstrap_servers: str = "localhost:9092", database_service=None):
         self.bootstrap_servers = bootstrap_servers
         self.producer = None
         self.consumer = None
         self.consumer_thread = None
         self.running = False
-        self.event_processor = SecurityEventProcessor()
+        self.database_service = database_service
+        self.event_processor = SecurityEventProcessor(database_service=database_service)
         self._connected = False
         
     async def initialize(self):
@@ -207,10 +323,14 @@ class KafkaService:
                                 for message in messages:
                                     try:
                                         # Process each security event
-                                        asyncio.run(self.process_security_event(
+                                        # Create a new event loop for the thread
+                                        loop = asyncio.new_event_loop()
+                                        asyncio.set_event_loop(loop)
+                                        loop.run_until_complete(self.process_security_event(
                                             message.key, 
                                             message.value
                                         ))
+                                        loop.close()
                                     except Exception as e:
                                         logger.error("Error processing security event", error=str(e))
                         except Exception as e:

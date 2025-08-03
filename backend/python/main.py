@@ -75,7 +75,7 @@ async def lifespan(app: FastAPI):
                 raise
         
         try:
-            kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
+            kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS, database_service=db_service)
             await kafka_service.initialize()
             logger.info("Kafka service initialized")
         except Exception as e:
@@ -143,7 +143,7 @@ app = FastAPI(
 # Add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS_LIST,
+    allow_origins=["*"] if settings.NODE_ENV == "development" else settings.ALLOWED_ORIGINS_LIST,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,173 @@
+After running `run_security_tests.py`, here's exactly what you should expect to see in each page of the NodeGuard dashboard:
+
+## 🎯 What the Security Test Script Does
+
+The `run_security_tests.py` script sends __13 different security test events__ to Kafka, which are then processed by the ML engine and create incidents based on risk scores:
+
+### Test Events Generated:
+
+1. __CRITICAL Threats (Risk 9.0+)__:
+
+   - SQL Injection Attack (Risk: 9.2)
+   - Ransomware Activity (Risk: 9.8)
+   - APT Command & Control (Risk: 9.5)
+   - Zero-Day Exploit (Risk: 9.9)
+
+2. __HIGH Threats (Risk 7.0-8.9)__:
+
+   - Lateral Movement (Risk: 8.7)
+   - Data Exfiltration (Risk: 9.1)
+   - Privilege Escalation (Risk: 8.9)
+
+3. __MEDIUM Threats (Risk 5.0-6.9)__:
+
+   - Brute Force Attack (Risk: 6.5)
+   - Port Scanning (Risk: 5.8)
+   - DNS Tunneling (Risk: 6.2)
+
+4. __LOW/BENIGN Events (Risk <5.0)__:
+
+   - Normal Web Traffic (Risk: 1.2)
+   - System Update (Risk: 0.5)
+   - Admin Activity (Risk: 2.1)
+
+## 📊 Dashboard Page - What You'll See:
+
+__Real-time Security Metrics:__
+
+- __Total Threats Detected__: ~13 new events
+- __Critical Incidents__: 4 (SQL Injection, Ransomware, APT C2, Zero-Day)
+- __High-Risk Events__: 3 (Lateral Movement, Data Exfiltration, Privilege Escalation)
+- __Risk Score Distribution__: Chart showing threat severity breakdown
+- __Recent Activity Timeline__: Live feed of incoming threats
+- __Top Threat Types__: Malware, Web Attacks, APT Activity, Network Attacks
+
+__Expected Dashboard Widgets:__
+
+- Threat severity pie chart (Critical: 4, High: 3, Medium: 3, Low: 3)
+- Geographic threat map (if IP geolocation is enabled)
+- Attack timeline showing the sequence of events
+- ML confidence scores for each detection
+
+## 🚨 Incidents Page - What You'll See:
+
+__New Security Incidents Created:__
+
+1. __"Critical SQL Injection Attack Detected"__
+
+   - Severity: Critical | Status: Open
+   - Source: External IP | Target: Internal web server
+   - ML Score: 9.2 | Detection: Pattern Matching
+
+2. __"Ransomware Activity - Immediate Response Required"__
+
+   - Severity: Critical | Status: Open
+   - Process: encrypt.exe | Files Encrypted: 1,247
+   - ML Score: 9.8 | Detection: Behavioral Analysis
+
+3. __"APT Command & Control Communication"__
+
+   - Severity: Critical | Status: Open
+   - C2 Domain: legitimate-looking-domain.com
+   - ML Score: 9.5 | APT Group: APT29 (CozyBear)
+
+4. __"Zero-Day Exploit Attempt"__
+
+   - Severity: Critical | Status: Open
+   - Target: Microsoft Exchange | Method: RCE
+   - ML Score: 9.9 | Payload: Webshell
+
+5. __"Lateral Movement Detected"__
+
+   - Severity: High | Status: Open
+   - Protocol: SMB | Tools: psexec, wmiexec
+   - ML Score: 8.7 | Privilege Escalation: Yes
+
+6. __"Data Exfiltration in Progress"__
+
+   - Severity: High | Status: Open
+   - Volume: 2.3 GB | Files: 1,543 documents
+   - ML Score: 9.1 | Duration: 45 minutes
+
+7. __"Privilege Escalation Attempt"__
+
+   - Severity: High | Status: Open
+   - Method: Token Impersonation | Tool: Mimikatz
+   - ML Score: 8.9 | CVE: CVE-2021-34527
+
+__Incident Details Include:__
+
+- Automated severity classification
+- Recommended response actions
+- Related events and correlations
+- Timeline of attack progression
+- Affected systems and users
+
+## 🔍 Threat Intelligence Page - What You'll See:
+
+__New Threat Indicators:__
+
+- __Malicious IPs__: External IPs from the test events
+- __Suspicious Domains__: legitimate-looking-domain.com (C2 domain)
+- __File Hashes__: encrypt.exe and other malicious binaries
+- __Attack Patterns__: SQL injection signatures, ransomware behaviors
+- __IOCs (Indicators of Compromise)__: Bitcoin addresses, file paths, registry keys
+
+__Threat Intelligence Feeds:__
+
+- Updated threat scores for detected IPs
+- New malware signatures from ransomware test
+- APT29/CozyBear campaign indicators
+- Zero-day exploit patterns
+
+__Expected Intelligence Updates:__
+
+- Threat actor attribution (APT29)
+- Campaign tracking (CozyBear)
+- TTPs (Tactics, Techniques, Procedures) mapping
+- Related threat reports and analysis
+
+## 📋 Compliance Reports Page - What You'll See:
+
+__Policy Violations Detected:__
+
+- __Data Protection Violations__: From data exfiltration event
+- __Access Control Failures__: From privilege escalation attempts
+- __Network Security Breaches__: From lateral movement
+- __Incident Response Triggers__: All critical/high severity events
+
+__Compliance Metrics:__
+
+- __Security Posture Score__: Decreased due to critical incidents
+- __Policy Adherence__: Violations in access control, data protection
+- __Incident Response Time__: Time to detect and classify threats
+- __Risk Assessment__: Updated risk profile based on new threats
+
+## 🔄 Expected System Behavior:
+
+__Immediate (0-30 seconds):__
+
+- Events appear in real-time dashboard feed
+- ML engine processes and scores each event
+- Critical/High events trigger incident creation
+
+__Short-term (1-5 minutes):__
+
+- Incidents populated with full details
+- Threat intelligence updated with new IOCs
+- Compliance reports reflect new violations
+- Automated workflows may trigger (if configured)
+
+__Ongoing:__
+
+- Correlation engine links related events
+- Risk scores updated based on threat patterns
+- Historical trending data updated
+- Alert notifications sent (if configured)
+
+## 🎯 Key Success Indicators:
+
+✅ __Dashboard shows 13 new events processed__ ✅ __7 new security incidents created (Critical + High risk)__ ✅ __Threat intelligence updated with new IOCs__ ✅ __Compliance violations logged and tracked__ ✅ __ML confidence scores displayed (0.87-0.99)__ ✅ __Real-time event processing working__ ✅ __No errors in system logs__
+
+The system should demonstrate end-to-end threat detection, from raw security events through ML analysis to actionable security incidents and intelligence updates.
+
