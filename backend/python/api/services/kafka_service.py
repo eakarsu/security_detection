@@ -258,6 +258,25 @@ class KafkaService:
             logger.error("Error processing security event", error=str(e), key=key)
             return {"status": "error", "error": str(e)}
     
+    async def process_security_events(self):
+        """Process security events - main pipeline method called from main.py"""
+        try:
+            if not self._connected:
+                logger.debug("Kafka not connected, skipping event processing")
+                return
+            
+            # This method is called periodically from the main threat detection pipeline
+            # The actual event processing happens in the consumer thread via process_security_event
+            # We can use this to perform any periodic maintenance or monitoring
+            
+            logger.debug("Security event processing pipeline active")
+            
+            # Optional: Send a test event periodically for monitoring
+            # await self.send_test_event("Pipeline Health Check", 1.0)
+            
+        except Exception as e:
+            logger.error("Error in security events processing pipeline", error=str(e))
+    
     async def publish_event(self, topic: str, event: Dict[str, Any], key: Optional[str] = None) -> bool:
         """Publish event to Kafka topic"""
         try:

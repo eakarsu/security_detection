@@ -50,40 +50,39 @@ async def get_threat_intelligence(
 ) -> Dict[str, Any]:
     """Get threat intelligence data including indicators and feeds"""
     try:
-        conn = await get_database_connection()
-        
-        # Build query with filters
-        query = """
-            SELECT 
-                id,
-                indicator_type,
-                indicator_value,
-                threat_type,
-                confidence_score,
-                source,
-                description,
-                first_seen,
-                last_seen,
-                is_active,
-                created_at
-            FROM security.threat_intel
-            WHERE is_active = true
-        """
-        params = []
-        
-        if type:
-            query += " AND indicator_type = $" + str(len(params) + 1)
-            params.append(type)
+        # Use async context manager for database connection
+        async with await get_database_connection() as conn:
+            # Build query with filters
+            query = """
+                SELECT 
+                    id,
+                    indicator_type,
+                    indicator_value,
+                    threat_type,
+                    confidence_score,
+                    source,
+                    description,
+                    first_seen,
+                    last_seen,
+                    is_active,
+                    created_at
+                FROM security.threat_intel
+                WHERE is_active = true
+            """
+            params = []
             
-        if search:
-            query += " AND (indicator_value ILIKE $" + str(len(params) + 1) + " OR description ILIKE $" + str(len(params) + 2) + ")"
-            params.extend([f"%{search}%", f"%{search}%"])
+            if type:
+                query += " AND indicator_type = $" + str(len(params) + 1)
+                params.append(type)
+                
+            if search:
+                query += " AND (indicator_value ILIKE $" + str(len(params) + 1) + " OR description ILIKE $" + str(len(params) + 2) + ")"
+                params.extend([f"%{search}%", f"%{search}%"])
+                
+            query += " ORDER BY confidence_score DESC, last_seen DESC LIMIT $" + str(len(params) + 1)
+            params.append(limit)
             
-        query += " ORDER BY confidence_score DESC, last_seen DESC LIMIT $" + str(len(params) + 1)
-        params.append(limit)
-        
-        rows = await conn.fetch(query, *params)
-        await conn.close()
+            rows = await conn.fetch(query, *params)
         
         indicators = []
         for row in rows:
@@ -218,27 +217,26 @@ async def get_threat_feeds() -> List[ThreatFeed]:
 async def get_threat_indicator(indicator_id: str) -> ThreatIndicator:
     """Get specific threat indicator"""
     try:
-        conn = await get_database_connection()
-        
-        query = """
-            SELECT 
-                id,
-                indicator_type,
-                indicator_value,
-                threat_type,
-                confidence_score,
-                source,
-                description,
-                first_seen,
-                last_seen,
-                is_active,
-                created_at
-            FROM security.threat_intel
-            WHERE id = $1
-        """
-        
-        row = await conn.fetchrow(query, indicator_id)
-        await conn.close()
+        # Use async context manager for database connection
+        async with await get_database_connection() as conn:
+            query = """
+                SELECT 
+                    id,
+                    indicator_type,
+                    indicator_value,
+                    threat_type,
+                    confidence_score,
+                    source,
+                    description,
+                    first_seen,
+                    last_seen,
+                    is_active,
+                    created_at
+                FROM security.threat_intel
+                WHERE id = $1
+            """
+            
+            row = await conn.fetchrow(query, indicator_id)
         
         if not row:
             raise HTTPException(status_code=404, detail="Threat indicator not found")

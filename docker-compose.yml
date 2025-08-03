@@ -42,7 +42,7 @@ services:
 
   # Message Queue
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.7.0
     platform: linux/amd64
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -59,7 +59,7 @@ services:
       retries: 5
 
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.7.0
     platform: linux/amd64
     depends_on:
       zookeeper:
@@ -186,7 +186,7 @@ services:
 
   # Monitoring
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.48.1
     ports:
       - "9090:9090"
     volumes:
@@ -196,7 +196,7 @@ services:
       - nodeguard-network
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.2.3
     ports:
       - "3002:3000"
     environment:

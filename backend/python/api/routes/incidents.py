@@ -42,42 +42,41 @@ async def get_incidents(
 ) -> List[Incident]:
     """Get security incidents from database"""
     try:
-        conn = await get_database_connection()
-        
-        # Build query with filters
-        query = """
-            SELECT 
-                id as incident_id,
-                event_type,
-                description,
-                severity,
-                status,
-                source_ip,
-                destination_ip,
-                user_id,
-                endpoint,
-                ml_score,
-                created_at,
-                updated_at,
-                assigned_to
-            FROM security.events
-            WHERE 1=1
-        """
-        params = []
-        
-        if status:
-            query += " AND status = $" + str(len(params) + 1)
-            params.append(status)
+        # Use async context manager for database connection
+        async with await get_database_connection() as conn:
+            # Build query with filters
+            query = """
+                SELECT 
+                    id,
+                    event_type,
+                    description,
+                    severity,
+                    status,
+                    source_ip,
+                    destination_ip,
+                    user_id,
+                    endpoint,
+                    ml_score,
+                    created_at,
+                    updated_at,
+                    assigned_to
+                FROM security.events
+                WHERE 1=1
+            """
+            params = []
             
-        if severity:
-            query += " AND severity = $" + str(len(params) + 1)
-            params.append(severity)
+            if status:
+                query += " AND status = $" + str(len(params) + 1)
+                params.append(status)
+                
+            if severity:
+                query += " AND severity = $" + str(len(params) + 1)
+                params.append(severity)
+                
+            query += " ORDER BY created_at DESC LIMIT $" + str(len(params) + 1)
+            params.append(limit)
             
-        query += " ORDER BY created_at DESC LIMIT $" + str(len(params) + 1)
-        params.append(limit)
-        
-        rows = await conn.fetch(query, *params)
-        await conn.close()
+            rows = await conn.fetch(query, *params)
         
         incidents = []
         for row in rows:
@@ -98,7 +97,7 @@ async def get_incidents(
                 tags.append("high_confidence")
                 
             incident = Incident(
-                incident_id=str(row['incident_id']),
+                incident_id=str(row['id']),
                 title=title,
                 description=row['description'],
                 severity=row['severity'],
