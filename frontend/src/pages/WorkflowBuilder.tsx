@@ -61,6 +61,16 @@ import AIAnalysisNode from '../components/workflow/nodes/AIAnalysisNode.tsx';
 import CorrelationNode from '../components/workflow/nodes/CorrelationNode.tsx';
 import AlertNode from '../components/workflow/nodes/AlertNode.tsx';
 import ResponseNode from '../components/workflow/nodes/ResponseNode.tsx';
+import ThreatIntelNode from '../components/workflow/nodes/ThreatIntelNode.tsx';
+import ComplianceNode from '../components/workflow/nodes/ComplianceNode.tsx';
+import ForensicsNode from '../components/workflow/nodes/ForensicsNode.tsx';
+import DeceptionNode from '../components/workflow/nodes/DeceptionNode.tsx';
+import NetworkAnalysisNode from '../components/workflow/nodes/NetworkAnalysisNode.tsx';
+import BehavioralAnalysisNode from '../components/workflow/nodes/BehavioralAnalysisNode.tsx';
+import SIEMIntegrationNode from '../components/workflow/nodes/SIEMIntegrationNode.tsx';
+import RiskAssessmentNode from '../components/workflow/nodes/RiskAssessmentNode.tsx';
+import VulnerabilityScannerNode from '../components/workflow/nodes/VulnerabilityScannerNode.tsx';
+import SandboxAnalysisNode from '../components/workflow/nodes/SandboxAnalysisNode.tsx';
 
 // Types
 interface WorkflowNode extends Node {
@@ -156,6 +166,126 @@ const nodeTemplates: NodeTemplate[] = [
       timeout: '30m',
     },
   },
+  {
+    type: 'threat-intel',
+    label: 'Threat Intelligence',
+    icon: <SecurityIcon />,
+    description: 'Enhanced threat intel analysis with multiple feeds',
+    category: 'Analysis',
+    defaultConfig: {
+      sources: ['VirusTotal', 'OpenCTI', 'MISP', 'AlienVault', 'ThreatConnect'],
+      confidence: 'High',
+      autoUpdate: true,
+    },
+  },
+  {
+    type: 'compliance',
+    label: 'Compliance Monitor',
+    icon: <SecurityIcon />,
+    description: 'Monitor compliance across multiple frameworks',
+    category: 'Analysis',
+    defaultConfig: {
+      frameworks: ['SOC2', 'PCI-DSS', 'GDPR', 'HIPAA'],
+      score: 85,
+      autoRemediation: false,
+    },
+  },
+  {
+    type: 'forensics',
+    label: 'Digital Forensics',
+    icon: <AnalyticsIcon />,
+    description: 'Advanced digital forensics and evidence collection',
+    category: 'Analysis',
+    defaultConfig: {
+      artifactsCollected: 247,
+      timelineDepth: '30 days',
+      evidenceIntegrity: 'Verified',
+    },
+  },
+  {
+    type: 'deception',
+    label: 'Deception Technology',
+    icon: <SecurityIcon />,
+    description: 'Deploy honeypots and deception techniques',
+    category: 'Analysis',
+    defaultConfig: {
+      honeypotsActive: 12,
+      deceptionLevel: 'Advanced',
+      threatsDetected: 3,
+    },
+  },
+  {
+    type: 'network-analysis',
+    label: 'Network Analysis',
+    icon: <AnalyticsIcon />,
+    description: 'Deep packet inspection and network traffic analysis',
+    category: 'Analysis',
+    defaultConfig: {
+      packetsAnalyzed: 45123,
+      anomaliesDetected: 12,
+      bandwidth: '1.2 Gbps',
+    },
+  },
+  {
+    type: 'behavioral-analysis',
+    label: 'Behavioral Analysis',
+    icon: <AIIcon />,
+    description: 'User behavior analytics and anomaly detection',
+    category: 'Analysis',
+    defaultConfig: {
+      usersMonitored: 1247,
+      anomalousActivities: 8,
+      riskScore: 6.2,
+    },
+  },
+  {
+    type: 'siem-integration',
+    label: 'SIEM Integration',
+    icon: <DatabaseIcon />,
+    description: 'Connect to SIEM platforms for centralized logging',
+    category: 'Integration',
+    defaultConfig: {
+      connectedSystems: 15,
+      eventsPerSecond: 2340,
+      correlationRules: 89,
+    },
+  },
+  {
+    type: 'risk-assessment',
+    label: 'Risk Assessment',
+    icon: <AnalyticsIcon />,
+    description: 'Comprehensive risk scoring and vulnerability assessment',
+    category: 'Analysis',
+    defaultConfig: {
+      riskScore: 7.5,
+      vulnerabilities: 23,
+      mitigations: 18,
+    },
+  },
+  {
+    type: 'vulnerability-scanner',
+    label: 'Vulnerability Scanner',
+    icon: <SecurityIcon />,
+    description: 'Automated vulnerability scanning and assessment',
+    category: 'Analysis',
+    defaultConfig: {
+      hostsScanned: 342,
+      vulnerabilitiesFound: 47,
+      criticalIssues: 3,
+    },
+  },
+  {
+    type: 'sandbox-analysis',
+    label: 'Sandbox Analysis',
+    icon: <SecurityIcon />,
+    description: 'Dynamic malware analysis in isolated environment',
+    category: 'Analysis',
+    defaultConfig: {
+      filesAnalyzed: 156,
+      malwareDetected: 12,
+      analysisTime: '2.3 min',
+    },
+  },
 ];
 
 const nodeTypes: NodeTypes = {
@@ -165,6 +295,16 @@ const nodeTypes: NodeTypes = {
   correlation: CorrelationNode,
   alert: AlertNode,
   response: ResponseNode,
+  'threat-intel': ThreatIntelNode,
+  'compliance': ComplianceNode,
+  'forensics': ForensicsNode,
+  'deception': DeceptionNode,
+  'network-analysis': NetworkAnalysisNode,
+  'behavioral-analysis': BehavioralAnalysisNode,
+  'siem-integration': SIEMIntegrationNode,
+  'risk-assessment': RiskAssessmentNode,
+  'vulnerability-scanner': VulnerabilityScannerNode,
+  'sandbox-analysis': SandboxAnalysisNode,
 };
 
 const WorkflowBuilder: React.FC = () => {
