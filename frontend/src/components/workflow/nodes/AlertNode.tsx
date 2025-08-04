@@ -65,6 +65,16 @@ const AlertNode: React.FC<AlertNodeProps> = ({ data }) => {
           height: 12,
         }}
       />
+      
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          background: '#ff9800',
+          width: 12,
+          height: 12,
+        }}
+      />
     </Box>
   );
 };

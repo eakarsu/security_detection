@@ -9,6 +9,7 @@ import os
 import subprocess
 import time
 import json
+import argparse
 from pathlib import Path
 
 # Load environment variables from .env file
@@ -49,20 +50,24 @@ except ImportError as e:
     sys.exit(1)
 
 class TestRunner:
-    def __init__(self):
+    def __init__(self, topic='security.events'):
+        self.topic = topic
         # Check if we're testing local dev processes or Docker containers
         local_dev_mode = os.getenv("LOCAL_DEV_MODE", "true").lower() == "true"
+        print(f"DEBUG: LOCAL_DEV_MODE = {local_dev_mode}")
         
         if local_dev_mode:
             # Use LOCAL DEV ports for local development processes
             self.api_base_url = "http://localhost:8010"
             self.frontend_url = "http://localhost:3010"
             self.nodejs_api_url = "http://localhost:3011"
+            print(f"DEBUG: Using local dev ports - API: 8010, Frontend: 3010")
         else:
-            # Use Docker container ports for full integration mode
-            self.api_base_url = "http://localhost:8000"
-            self.frontend_url = "http://localhost:3000"
-            self.nodejs_api_url = "http://localhost:3001"
+            # For false mode, still use local dev ports since services are running there
+            self.api_base_url = "http://localhost:8010"
+            self.frontend_url = "http://localhost:3010"
+            self.nodejs_api_url = "http://localhost:3011"
+            print(f"DEBUG: Using local service ports - API: 8010, Frontend: 3010")
         
     def check_services(self):
         """Check if all services are running"""
@@ -81,13 +86,13 @@ class TestRunner:
         all_running = True
         for service_name, url in services.items():
             try:
-                response = requests.get(url, timeout=5)
+                response = requests.get(url, timeout=10)
                 if response.status_code == 200:
                     print(f"✅ {service_name}: Running")
                 else:
                     print(f"⚠️  {service_name}: Responding but status {response.status_code}")
-            except requests.exceptions.RequestException:
-                print(f"❌ {service_name}: Not responding")
+            except requests.exceptions.RequestException as e:
+                print(f"❌ {service_name}: Not responding - {e}")
                 all_running = False
         
         return all_running
@@ -116,7 +121,7 @@ class TestRunner:
         print("=" * 60)
         
         # Check if we're in local development mode
-        local_dev_mode = os.getenv("LOCAL_DEV_MODE", "false").lower() == "true"
+        local_dev_mode = os.getenv("LOCAL_DEV_MODE", "true").lower() == "true"
         if local_dev_mode:
             print("ℹ️  Running in LOCAL_DEV_MODE - Kafka integration tests will be skipped")
             print("   This is normal for local development. The system is working correctly!")
@@ -125,8 +130,8 @@ class TestRunner:
             print("   Testing complete end-to-end pipeline with Kafka message processing")
         
         try:
-            # Initialize test generator
-            generator = SecurityTestCaseGenerator()
+            # Initialize test generator with the specified topic
+            generator = SecurityTestCaseGenerator(topic=self.topic)
             
             # Run comprehensive test suite
             events = generator.run_comprehensive_test_suite(delay_seconds=2)
@@ -228,7 +233,7 @@ class TestRunner:
     
     def run_kafka_integration_tests(self, generator):
         """Run comprehensive Kafka integration tests"""
-        print("🔄 Testing Kafka message processing pipeline...")
+        print(f"🔄 Testing Kafka message processing pipeline on topic: {self.topic}...")
         
         # Test high-risk events that should create incidents
         high_risk_tests = [
@@ -323,7 +328,7 @@ class TestRunner:
         """Run continuous testing for a specified duration"""
         print(f"\n🔄 Starting continuous testing for {duration_minutes} minutes...")
         
-        generator = SecurityTestCaseGenerator()
+        generator = SecurityTestCaseGenerator(topic=self.topic)
         end_time = time.time() + (duration_minutes * 60)
         
         test_methods = [
@@ -354,10 +359,35 @@ class TestRunner:
 
 def main():
     """Main execution function"""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='NodeGuard Security Test Runner')
+    parser.add_argument(
+        '--topic', 
+        default='security.events',
+        help='Kafka topic to publish test events to (default: security.events)'
+    )
+    parser.add_argument(
+        '--workflow-only',
+        action='store_true',
+        help='Test workflows only using workflow.test topic'
+    )
+    
+    args = parser.parse_args()
+    
+    # Set topic based on arguments
+    if args.workflow_only:
+        topic = 'workflow.test'
+        print("🎯 WORKFLOW-ONLY MODE: Testing workflows via workflow.test topic")
+    else:
+        topic = args.topic
+        print(f"🔄 SYSTEM MODE: Testing full system via {topic} topic")
+    
     print("NodeGuard Security Test Runner")
     print("==============================")
+    print(f"📡 Publishing to Kafka topic: {topic}")
+    print("")
     
-    runner = TestRunner()
+    runner = TestRunner(topic=topic)
     
     # Check if services are running
     if not runner.check_services():

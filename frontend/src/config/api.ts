@@ -42,7 +42,8 @@ export const ENDPOINTS = {
   // Node.js API endpoints
   auth: () => getApiEndpoint('/auth', 'nodejs'),
   security: () => getApiEndpoint('/security', 'nodejs'),
-  workflow: () => getApiEndpoint('/workflow', 'nodejs'),
+  workflows: () => getApiEndpoint('/api/v1/workflows', 'nodejs'),
+  workflowExecute: (id: string) => getApiEndpoint(`/api/v1/workflows/${id}/execute`, 'nodejs'),
   health: () => getApiEndpoint('/health', 'nodejs'),
   status: () => getApiEndpoint('/api/v1/status', 'nodejs'),
 };

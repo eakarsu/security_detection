@@ -30,13 +30,13 @@ except ImportError:
             pass
 
 class SecurityTestCaseGenerator:
-    def __init__(self, kafka_bootstrap_servers='localhost:9092'):
+    def __init__(self, kafka_bootstrap_servers='localhost:9092', topic='security.events'):
         self.producer = KafkaProducer(
             bootstrap_servers=[kafka_bootstrap_servers],
             value_serializer=lambda v: json.dumps(v).encode('utf-8'),
             key_serializer=lambda k: k.encode('utf-8') if k else None
         )
-        self.topic = 'security-events'
+        self.topic = topic
         
     def generate_timestamp(self, offset_minutes=0):
         """Generate timestamp with optional offset"""

@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { WorkflowExecutionService } from './workflow-execution.service';
 
 export interface WorkflowNode {
   id: string;
@@ -27,8 +30,77 @@ export interface Workflow {
 
 @Injectable()
 export class WorkflowService {
-  private workflows: Workflow[] = [
-    {
+  private readonly workflowsDir = path.join(process.cwd(), '..', '..', 'data', 'workflows');
+  private workflows: Workflow[] = [];
+
+  constructor(private readonly workflowExecutionService: WorkflowExecutionService) {
+    this.initializeWorkflows();
+  }
+
+  private async initializeWorkflows() {
+    try {
+      // Ensure workflows directory exists
+      await fs.mkdir(this.workflowsDir, { recursive: true });
+      
+      // Load existing workflows from files
+      await this.loadWorkflowsFromFiles();
+      
+      // If no workflows exist, create default template
+      if (this.workflows.length === 0) {
+        await this.createDefaultWorkflow();
+      }
+    } catch (error) {
+      console.error('Error initializing workflows:', error);
+    }
+  }
+
+  private async loadWorkflowsFromFiles() {
+    try {
+      const files = await fs.readdir(this.workflowsDir);
+      const jsonFiles = files.filter(file => file.endsWith('.json'));
+      
+      for (const file of jsonFiles) {
+        try {
+          const filePath = path.join(this.workflowsDir, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          const workflow = JSON.parse(content);
+          this.workflows.push(workflow);
+        } catch (error) {
+          console.error(`Error loading workflow from ${file}:`, error);
+        }
+      }
+      
+      console.log(`Loaded ${this.workflows.length} workflows from filesystem`);
+    } catch (error) {
+      console.error('Error reading workflows directory:', error);
+    }
+  }
+
+  private async saveWorkflowToFile(workflow: Workflow) {
+    try {
+      const fileName = `workflow-${workflow.id}.json`;
+      const filePath = path.join(this.workflowsDir, fileName);
+      await fs.writeFile(filePath, JSON.stringify(workflow, null, 2), 'utf-8');
+      console.log(`Saved workflow ${workflow.id} to ${filePath}`);
+    } catch (error) {
+      console.error(`Error saving workflow ${workflow.id}:`, error);
+      throw error;
+    }
+  }
+
+  private async deleteWorkflowFile(id: string) {
+    try {
+      const fileName = `workflow-${id}.json`;
+      const filePath = path.join(this.workflowsDir, fileName);
+      await fs.unlink(filePath);
+      console.log(`Deleted workflow file ${filePath}`);
+    } catch (error) {
+      console.error(`Error deleting workflow file for ${id}:`, error);
+    }
+  }
+
+  private async createDefaultWorkflow() {
+    const defaultWorkflow: Workflow = {
       id: '1',
       name: 'Basic Threat Detection',
       description: 'Standard workflow for detecting and responding to security threats',
@@ -66,8 +138,11 @@ export class WorkflowService {
       isActive: true,
       createdAt: '2025-01-15T10:00:00Z',
       updatedAt: '2025-01-15T10:00:00Z'
-    }
-  ];
+    };
+    
+    this.workflows.push(defaultWorkflow);
+    await this.saveWorkflowToFile(defaultWorkflow);
+  }
 
   async getAllWorkflows(): Promise<Workflow[]> {
     return this.workflows;
@@ -86,6 +161,7 @@ export class WorkflowService {
     };
     
     this.workflows.push(newWorkflow);
+    await this.saveWorkflowToFile(newWorkflow);
     return newWorkflow;
   }
 
@@ -99,6 +175,7 @@ export class WorkflowService {
       updatedAt: new Date().toISOString()
     };
 
+    await this.saveWorkflowToFile(this.workflows[index]);
     return this.workflows[index];
   }
 
@@ -107,6 +184,7 @@ export class WorkflowService {
     if (index === -1) return false;
 
     this.workflows.splice(index, 1);
+    await this.deleteWorkflowFile(id);
     return true;
   }
 
@@ -116,22 +194,8 @@ export class WorkflowService {
       throw new Error('Workflow not found');
     }
 
-    // Simulate workflow execution
-    const result = {
-      workflowId: id,
-      executionId: Date.now().toString(),
-      status: 'completed',
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString(),
-      results: {
-        inputProcessed: true,
-        mlScore: 0.85,
-        aiAnalysis: 'Potential security threat detected',
-        alertGenerated: true
-      }
-    };
-
-    return result;
+    // Execute workflow using the real execution service
+    return await this.workflowExecutionService.executeWorkflow(workflow, inputData);
   }
 
   async getWorkflowTemplates() {

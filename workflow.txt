@@ -1,0 +1,83 @@
+How Workflows Work in NodeGuard
+
+  Based on my analysis, here's how the workflow system operates in your NodeGuard security
+  platform:
+
+  🎯 Core Purpose
+
+  Workflows automate complex security detection and response operations through visual
+  drag-and-drop pipelines. Think of it as "security automation made visual" - you build security
+  processes like connecting building blocks.
+
+  🔧 How It Works
+
+  1. Visual Workflow Builder
+
+  - Drag & Drop Interface: Use React Flow to visually connect security nodes
+  - Node Palette: Choose from 6 specialized security node types:
+    - Input: Data ingestion (Kafka, logs, events)
+    - ML Scoring: Classical ML analysis (XGBoost, Random Forest)
+    - AI Analysis: Advanced AI using Claude Sonnet 4
+    - Correlation: Event correlation across time/systems
+    - Alert: Multi-channel alert generation
+    - Response: Automated security actions
+
+  2. Workflow Creation Process
+
+  1. Select Node → 2. Configure Parameters → 3. Connect Nodes → 4. Save Workflow → 5. Execute
+
+  3. Real-World Example Workflows
+
+  Basic Threat Detection Pipeline:
+  Network Logs → ML Scoring → AI Analysis → Alert Generation → Response Actions
+
+  Compliance Monitoring:
+  Audit Events → Policy Validation → Correlation Analysis → Compliance Alert
+
+  Incident Response:
+  Security Event → Threat Assessment → Risk Scoring → Auto-Response → Notification
+
+  🏗️ System Architecture
+
+  Frontend (React)
+
+  - Visual workflow designer with React Flow
+  - Real-time node status indicators
+  - Interactive configuration dialogs
+  - Workflow templates and presets
+
+  Backend (Node.js)
+
+  - RESTful API for workflow management
+  - Workflow execution engine
+  - Integration with Python ML services
+  - Connection to Kafka for real-time data
+
+  Key Integration Points
+
+  - Python ML Models: Your existing XGBoost/Random Forest models
+  - OpenRouter AI: Claude Sonnet 4 for advanced analysis
+  - Kafka Streams: Real-time security event processing
+  - Alert Systems: Email, Slack, SMS notifications
+
+  💡 Practical Benefits
+
+  1. No-Code Security Automation: Build complex security processes visually
+  2. AI-Powered Analysis: Combine classical ML with modern LLM capabilities
+  3. Real-Time Processing: Connect to your existing Kafka event streams
+  4. Flexible Response: Automated actions with approval workflows
+  5. Template Library: Pre-built workflows for common security scenarios
+
+  🚀 Current Status
+
+  - ✅ Visual builder fully functional
+  - ✅ All node types implemented
+  - ✅ Template system ready
+  - ✅ API endpoints active
+  - 🔄 Execution engine currently simulated (ready for production integration)
+
+  The workflow system is designed to transform your security operations from manual, reactive
+  processes into automated, proactive security pipelines. You can build anything from simple threat
+   detection to complex multi-stage incident response workflows!
+
+  Would you like me to show you how to create a specific type of security workflow?

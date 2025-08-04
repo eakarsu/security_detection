@@ -693,6 +693,43 @@ class MLService:
         except Exception as e:
             logger.error("Scheduled model training failed", error=str(e))
     
+    def extract_features(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract features from event data for workflow ML node"""
+        # Convert event data to SecurityEvent for feature extraction
+        event = SecurityEvent(event_data)
+        return self.feature_extractor.extract_features(event)
+    
+    async def predict_threat_from_features(self, features: Dict[str, Any], model_type: str = "ensemble") -> Dict[str, Any]:
+        """Predict threat from features for workflow ML node"""
+        try:
+            # Convert features dict to SecurityEvent for processing
+            event_data = {
+                "event_id": features.get("event_id", "workflow_event"),
+                "timestamp": datetime.now(timezone.utc),
+                "event_type": features.get("event_type", "security_event"),
+                "severity": features.get("severity", "medium")
+            }
+            event_data.update(features)
+            
+            event = SecurityEvent(event_data)
+            prediction = await self.predict_threat(event)
+            
+            return {
+                "threat_score": prediction.threat_score,
+                "confidence": prediction.confidence,
+                "model_name": prediction.model_name,
+                "requires_ai_analysis": prediction.requires_ai_analysis
+            }
+            
+        except Exception as e:
+            logger.error("Threat prediction failed for workflow", error=str(e))
+            return {
+                "threat_score": 0.5,
+                "confidence": 0.1,
+                "model_name": "fallback",
+                "requires_ai_analysis": False
+            }
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get service statistics"""
         return {

@@ -46,7 +46,8 @@ async def get_incidents(
         # Get database service and connection
         db_service = await get_database_service()
         await db_service.ensure_connected()
-        async with db_service.get_connection_context() as conn:
+        connection_context = await db_service.get_connection_context()
+        async with connection_context as conn:
             # Build query with filters
             query = """
                 SELECT 
@@ -125,6 +126,43 @@ async def get_incidents(
         raise HTTPException(status_code=500, detail="Failed to retrieve incidents")
 
 
+@router.get("/count")
+async def get_incident_count() -> dict:
+    """Get total count of all incidents"""
+    try:
+        # Get database service and connection
+        db_service = await get_database_service()
+        await db_service.ensure_connected()
+        connection_context = await db_service.get_connection_context()
+        
+        async with connection_context as conn:
+            # Count all incidents in security.events table
+            count_query = "SELECT COUNT(*) FROM security.events"
+            total_count = await conn.fetchval(count_query)
+            
+            # Also get counts by severity for additional info
+            severity_query = """
+                SELECT severity, COUNT(*) as count 
+                FROM security.events 
+                GROUP BY severity
+            """
+            severity_counts = await conn.fetch(severity_query)
+            
+            severity_breakdown = {row['severity']: row['count'] for row in severity_counts}
+        
+        logger.info("Retrieved incident count", total=total_count, by_severity=severity_breakdown)
+        
+        return {
+            "total_incidents": total_count,
+            "severity_breakdown": severity_breakdown,
+            "timestamp": datetime.utcnow().isoformat() + 'Z'
+        }
+        
+    except Exception as e:
+        logger.error("Error getting incident count", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get incident count")
+
+
 @router.get("/{incident_id}", response_model=Incident)
 async def get_incident(incident_id: str) -> Incident:
     """Get specific incident"""
@@ -148,12 +186,61 @@ async def get_incident(incident_id: str) -> Incident:
 
 
 @router.post("/", response_model=Incident)
-async def create_incident(incident: Incident) -> Incident:
+async def create_incident(incident_data: Dict[str, Any]) -> Incident:
     """Create new incident"""
     try:
-        logger.info("Creating new incident", title=incident.title)
-        # Mock creation - would save to database
-        return incident
+        logger.info("Creating new incident", title=incident_data.get('title', 'Unknown'))
+        
+        # Get database service and connection
+        db_service = await get_database_service()
+        await db_service.ensure_connected()
+        connection_context = await db_service.get_connection_context()
+        
+        async with connection_context as conn:
+            # Insert into security.events table
+            query = """
+                INSERT INTO security.events (
+                    event_type, description, severity, status,
+                    source_ip, destination_ip, user_id, endpoint,
+                    ml_score, created_at, updated_at, assigned_to
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), $10)
+                RETURNING id
+            """
+            
+            event_id = await conn.fetchval(
+                query,
+                incident_data.get('title', 'Security Incident'),
+                incident_data.get('description', 'Incident created via API'),
+                incident_data.get('severity', 'medium'),
+                incident_data.get('status', 'open'),
+                incident_data.get('source_ip'),
+                incident_data.get('destination_ip'),
+                incident_data.get('user_id'),
+                incident_data.get('endpoint'),
+                incident_data.get('ml_score'),
+                incident_data.get('assigned_to')
+            )
+            
+        logger.info("Successfully created incident in database", event_id=event_id)
+        
+        # Return incident object
+        return Incident(
+            incident_id=str(event_id),
+            title=incident_data.get('title', 'Security Incident'),
+            description=incident_data.get('description', 'Incident created via API'),
+            severity=incident_data.get('severity', 'medium'),
+            status=incident_data.get('status', 'open'),
+            created_at=datetime.utcnow().isoformat() + 'Z',
+            updated_at=datetime.utcnow().isoformat() + 'Z',
+            assigned_to=incident_data.get('assigned_to'),
+            tags=incident_data.get('tags', []),
+            source_ip=incident_data.get('source_ip'),
+            destination_ip=incident_data.get('destination_ip'),
+            user_id=incident_data.get('user_id'),
+            endpoint=incident_data.get('endpoint'),
+            ml_score=incident_data.get('ml_score'),
+            event_type=incident_data.get('event_type', 'security_incident')
+        )
         
     except Exception as e:
         logger.error("Error creating incident", error=str(e))

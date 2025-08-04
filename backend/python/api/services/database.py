@@ -111,10 +111,11 @@ class DatabaseService:
         await self.ensure_connected()
         return await self._pool.acquire()
     
-    def get_connection_context(self):
-        """Get database connection context manager"""
+    async def get_connection_context(self):
+        """Get database connection context manager with auto-reconnection"""
+        await self.ensure_connected()
         if not self._connected or not self._pool:
-            raise RuntimeError("Database not initialized - call ensure_connected() first")
+            raise RuntimeError("Database connection could not be established")
         return self._pool.acquire()
     
     async def close(self):

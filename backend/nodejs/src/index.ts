@@ -12,9 +12,13 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
 
-  // CORS
+  // CORS - Support both development ports
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+      'http://localhost:3000',  // Docker frontend
+      'http://localhost:3010',  // Local dev frontend
+      process.env.FRONTEND_URL || 'http://localhost:3000'
+    ].filter(Boolean),
     credentials: true,
   });
 

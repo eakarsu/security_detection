@@ -371,7 +371,7 @@ class OpenRouterService:
                 risk_score=float(parsed_data.get("risk_score", 0.0)),
                 confidence=float(parsed_data.get("confidence", 0.0)),
                 mitre_mappings=parsed_data.get("mitre_mappings", []),
-                recommendations=parsed_data.get("recommendations", []),
+                recommendations=self._parse_recommendations(parsed_data.get("recommendations", [])),
                 technical_details=parsed_data.get("technical_details", {}),
                 response_actions=parsed_data.get("response_actions", []),
                 compliance_impact=parsed_data.get("compliance_impact", {}),
@@ -467,6 +467,38 @@ class OpenRouterService:
                 "findings": [],
                 "recommendations": ["Manual review required"]
             }
+    
+    def _parse_recommendations(self, recommendations: List[Any]) -> List[str]:
+        """Parse recommendations from structured objects to simple strings"""
+        parsed_recommendations = []
+        
+        for rec in recommendations:
+            if isinstance(rec, dict):
+                # Extract information from structured recommendation
+                priority = rec.get('priority', '')
+                action = rec.get('action', '')
+                timeline = rec.get('timeline', '')
+                
+                # Combine into a readable string
+                if priority and action:
+                    if timeline:
+                        parsed_rec = f"[{priority.upper()}] {action} ({timeline})"
+                    else:
+                        parsed_rec = f"[{priority.upper()}] {action}"
+                    parsed_recommendations.append(parsed_rec)
+                elif action:
+                    parsed_recommendations.append(action)
+                else:
+                    # If it's a dict but missing expected fields, convert to string
+                    parsed_recommendations.append(str(rec))
+            elif isinstance(rec, str):
+                # Already a string, use as-is
+                parsed_recommendations.append(rec)
+            else:
+                # Convert other types to string
+                parsed_recommendations.append(str(rec))
+        
+        return parsed_recommendations
     
     def get_stats(self) -> Dict[str, Any]:
         """Get service statistics"""

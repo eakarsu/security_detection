@@ -58,6 +58,8 @@ interface Incident {
 
 const IncidentManagement: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [totalIncidentCount, setTotalIncidentCount] = useState<number>(0);
+  const [severityBreakdown, setSeverityBreakdown] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
@@ -76,6 +78,21 @@ const IncidentManagement: React.FC = () => {
     tags: []
   });
 
+  const fetchIncidentCount = async () => {
+    try {
+      const response = await fetch(`${ENDPOINTS.incidents()}/count`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch incident count');
+      }
+      
+      const data = await response.json();
+      setTotalIncidentCount(data.total_incidents);
+      setSeverityBreakdown(data.severity_breakdown || {});
+    } catch (err) {
+      console.error('Failed to fetch incident count:', err);
+    }
+  };
+
   const fetchIncidents = async () => {
     try {
       setLoading(true);
@@ -92,6 +109,9 @@ const IncidentManagement: React.FC = () => {
       
       const data = await response.json();
       setIncidents(data);
+      
+      // Also fetch the total count
+      await fetchIncidentCount();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch incidents');
     } finally {
@@ -229,10 +249,13 @@ const IncidentManagement: React.FC = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Total Incidents
+                Total Incidents (All Time)
               </Typography>
-              <Typography variant="h4">
-                {incidents.length}
+              <Typography variant="h4" color="primary">
+                {totalIncidentCount.toLocaleString()}
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                Showing {incidents.length} most recent
               </Typography>
             </CardContent>
           </Card>
@@ -241,9 +264,24 @@ const IncidentManagement: React.FC = () => {
           <Card>
             <CardContent>
               <Typography color="textSecondary" gutterBottom>
-                Open Incidents
+                Critical & High
               </Typography>
               <Typography variant="h4" color="error">
+                {((severityBreakdown.critical || 0) + (severityBreakdown.high || 0)).toLocaleString()}
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                Critical: {severityBreakdown.critical || 0}, High: {severityBreakdown.high || 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Open Incidents (Current Page)
+              </Typography>
+              <Typography variant="h4" color="warning">
                 {incidents.filter(i => i.status === 'open').length}
               </Typography>
             </CardContent>

@@ -19,6 +19,10 @@ from api.routes import (
     detection_router,
     incidents_router,
     ml_router,
+    ai_router,
+    correlation_router,
+    alerts_router,
+    response_router,
     compliance_router,
     threat_intel_router,
     dashboard_router
@@ -77,7 +81,7 @@ async def lifespan(app: FastAPI):
         # Only initialize Kafka if external services are enabled
         if not LocalDevSettings.DISABLE_EXTERNAL_SERVICES:
             try:
-                kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS, database_service=db_service)
+                kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
                 await kafka_service.initialize()
                 logger.info("Kafka service initialized")
             except Exception as e:
@@ -170,6 +174,10 @@ app.mount("/metrics", metrics_app)
 app.include_router(detection_router, prefix="/api/detection", tags=["Detection"])
 app.include_router(incidents_router, prefix="/api/incidents", tags=["Incidents"])
 app.include_router(ml_router, prefix="/api/ml", tags=["Machine Learning"])
+app.include_router(ai_router, prefix="/api/ai", tags=["AI Analysis"])
+app.include_router(correlation_router, prefix="/api/correlation", tags=["Event Correlation"])
+app.include_router(alerts_router, prefix="/api/alerts", tags=["Alert Management"])
+app.include_router(response_router, prefix="/api/response", tags=["Security Response"])
 app.include_router(compliance_router, prefix="/api/compliance", tags=["Compliance"])
 app.include_router(threat_intel_router, prefix="/api/threat-intel", tags=["Threat Intelligence"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])

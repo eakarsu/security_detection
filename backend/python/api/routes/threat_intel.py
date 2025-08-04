@@ -54,7 +54,8 @@ async def get_threat_intelligence(
         # Get database service and connection
         db_service = await get_database_service()
         await db_service.ensure_connected()
-        async with db_service.get_connection_context() as conn:
+        connection_context = await db_service.get_connection_context()
+        async with connection_context as conn:
             # Build query with filters
             query = """
                 SELECT 
@@ -223,7 +224,8 @@ async def get_threat_indicator(indicator_id: str) -> ThreatIndicator:
         # Get database service and connection
         db_service = await get_database_service()
         await db_service.ensure_connected()
-        async with db_service.get_connection_context() as conn:
+        connection_context = await db_service.get_connection_context()
+        async with connection_context as conn:
             query = """
                 SELECT 
                     id,
