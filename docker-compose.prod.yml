@@ -1,0 +1,316 @@
+version: '3.8'
+
+services:
+  # Database Services
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nodeguard}
+      POSTGRES_USER: ${POSTGRES_USER:-nodeguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/setup/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./scripts/setup/reset-db.sql:/docker-entrypoint-initdb.d/02-reset-db.sql
+      - ./scripts/setup/seed_security_data.sql:/docker-entrypoint-initdb.d/03-seed-data.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - security-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nodeguard} -d ${POSTGRES_DB:-nodeguard}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --protected-mode no --bind 0.0.0.0 --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - security-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - cluster.name=security-detection
+      - node.name=security-node-1
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    networks:
+      - security-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTICSEARCH_PASSWORD} http://localhost:9200/_cluster/health | grep -q '\"status\":\"yellow\"\\|\"status\":\"green\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Message Queue
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.0
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_LOG4J_ROOT_LOGLEVEL: WARN
+    ports:
+      - "${ZOOKEEPER_PORT:-2181}:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - security-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.0
+    restart: unless-stopped
+    platform: linux/amd64
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+      - "${KAFKA_JMX_PORT:-9101}:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - security-network
+    healthcheck:
+      test: ["CMD", "bash", "-c", "unset JMX_PORT; kafka-broker-api-versions --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backend Services
+  python-api:
+    build:
+      context: ./backend/python
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PYTHON_API_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-nodeguard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodeguard}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-nodeguard}
+      - POSTGRES_USER=${POSTGRES_USER:-nodeguard}
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME:-elastic}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-anthropic/claude-3.5-sonnet}
+      - FALLBACK_MODEL=${FALLBACK_MODEL:-openai/gpt-4o-mini}
+      - MAX_TOKENS=${MAX_TOKENS:-4000}
+      - TEMPERATURE=${TEMPERATURE:-0.1}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - NODE_ENV=${NODE_ENV:-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./models:/app/models:ro
+      - ./logs:/app/logs
+    networks:
+      - security-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  nodejs-api:
+    build:
+      context: ./backend/nodejs
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${NODEJS_API_PORT:-3001}:3001"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-nodeguard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodeguard}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-nodeguard}
+      - POSTGRES_USER=${POSTGRES_USER:-nodeguard}
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME:-elastic}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-anthropic/claude-3.5-sonnet}
+      - FALLBACK_MODEL=${FALLBACK_MODEL:-openai/gpt-4o-mini}
+      - MAX_TOKENS=${MAX_TOKENS:-4000}
+      - TEMPERATURE=${TEMPERATURE:-0.1}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - NODE_ENV=${NODE_ENV:-production}
+      - API_PORT=${API_PORT:-3001}
+      - PYTHON_API_URL=http://python-api:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      python-api:
+        condition: service_started
+    volumes:
+      - ./data/workflows:/app/data/workflows
+      - ./logs:/app/logs
+    networks:
+      - security-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:${NODEJS_API_PORT:-3001}
+      - REACT_APP_PYTHON_API_URL=http://localhost:${PYTHON_API_PORT:-8000}
+    depends_on:
+      - nodejs-api
+    networks:
+      - security-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - security-network
+
+  grafana:
+    image: grafana/grafana:10.2.3
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - security-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+  kafka_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  security-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

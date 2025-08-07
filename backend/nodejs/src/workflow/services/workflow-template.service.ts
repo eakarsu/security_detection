@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DeepPartial } from 'typeorm';
 import { WorkflowTemplate } from '../entities/workflow-template.entity';
 
 export interface CreateWorkflowTemplateDto {
@@ -172,7 +172,7 @@ export class WorkflowTemplateService {
 
     console.log('Seeding default workflow templates...');
 
-    const templates = [
+    const templates: DeepPartial<WorkflowTemplate>[] = [
       {
         name: 'Basic Threat Intelligence Enrichment',
         description: 'Enriches security events with threat intelligence data from multiple sources',
@@ -245,7 +245,7 @@ export class WorkflowTemplateService {
             version: '1.0.0',
             author: 'NodeGuard Security',
             tags: ['threat-intel', 'mitre', 'basic'],
-            complexity: 'beginner',
+            complexity: 'beginner' as const,
             estimated_time: '2-5 minutes'
           }
         },
@@ -346,7 +346,7 @@ export class WorkflowTemplateService {
             version: '1.0.0',
             author: 'NodeGuard Security',
             tags: ['malware', 'advanced', 'correlation'],
-            complexity: 'advanced',
+            complexity: 'advanced' as const,
             estimated_time: '10-15 minutes'
           }
         }
@@ -462,7 +462,7 @@ export class WorkflowTemplateService {
             version: '1.0.0',
             author: 'NodeGuard Security',
             tags: ['phishing', 'email', 'automation'],
-            complexity: 'intermediate',
+            complexity: 'intermediate' as const,
             estimated_time: '5-8 minutes'
           }
         }
@@ -558,7 +558,7 @@ export class WorkflowTemplateService {
             version: '1.0.0',
             author: 'NodeGuard Security',
             tags: ['brute-force', 'authentication', 'blocking'],
-            complexity: 'intermediate',
+            complexity: 'intermediate' as const,
             estimated_time: '3-5 minutes'
           }
         }

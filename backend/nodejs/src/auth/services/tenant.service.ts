@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Tenant } from '../entities/tenant.entity';
 import { User } from '../entities/user.entity';
 import { TenantSettings } from '../entities/tenant-settings.entity';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 export interface CreateTenantDto {
   name: string;
@@ -28,6 +28,7 @@ export interface UpdateTenantDto {
   status?: string;
   features?: any;
   branding?: any;
+  logo_url?: string;
 }
 
 @Injectable()
@@ -151,6 +152,12 @@ export class TenantService {
     return tenant;
   }
 
+  async findBySubdomain(subdomain: string): Promise<Tenant | null> {
+    return await this.tenantRepo.findOne({
+      where: { subdomain, is_active: true }
+    });
+  }
+
   async getTenantByDomain(domain: string): Promise<Tenant> {
     const tenant = await this.tenantRepo.findOne({
       where: { domain, is_active: true }
@@ -161,6 +168,12 @@ export class TenantService {
     }
 
     return tenant;
+  }
+
+  async findByDomain(domain: string): Promise<Tenant | null> {
+    return await this.tenantRepo.findOne({
+      where: { domain, is_active: true }
+    });
   }
 
   async updateTenant(tenantId: string, updateDto: UpdateTenantDto): Promise<Tenant> {
@@ -513,7 +526,7 @@ export class TenantService {
       where: { is_active: true, plan: 'trial' } 
     });
     const paidTenants = await this.tenantRepo.count({ 
-      where: { is_active: true, plan: ['starter', 'professional', 'enterprise'] } 
+      where: { is_active: true, plan: In(['starter', 'professional', 'enterprise']) } 
     });
 
     // Recent signups (last 30 days)

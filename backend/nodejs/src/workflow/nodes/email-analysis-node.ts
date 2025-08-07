@@ -90,6 +90,7 @@ export class EmailAnalysisNode extends SecurityNode {
         {
           name: 'email',
           type: 'object' as const,
+          required: true,
           description: 'Email data to analyze'
         }
       ],

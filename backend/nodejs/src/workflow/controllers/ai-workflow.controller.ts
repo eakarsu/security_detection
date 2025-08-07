@@ -268,8 +268,8 @@ export class AIWorkflowController {
     current_usage: number;
   }> {
     const aiEnabled = tenant.features?.ai_features === true;
-    const maxNodes = tenant.features?.max_workflow_nodes || 50;
-    const monthlyLimit = tenant.features?.ai_generations_per_month || 10;
+    const maxNodes = tenant.features?.max_workflows || 50;
+    const monthlyLimit = tenant.features?.max_executions_per_month || 10;
     
     // Get current month's usage (placeholder - would need actual usage tracking)
     const currentUsage = 0; // TODO: Implement actual usage tracking

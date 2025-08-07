@@ -92,10 +92,10 @@ export class NodeFactoryService {
 
       // Add execution metadata
       if (result.metadata) {
-        result.metadata.node_id = nodeId;
-        result.metadata.execution_id = context.executionId;
-        result.metadata.workflow_id = context.workflowId;
-        result.metadata.execution_time = executionTime;
+        (result.metadata as any).node_id = nodeId;
+        (result.metadata as any).execution_id = context.executionId;
+        (result.metadata as any).workflow_id = context.workflowId;
+        (result.metadata as any).execution_time = executionTime;
       }
 
       return {
@@ -120,7 +120,7 @@ export class NodeFactoryService {
             processing_time: executionTime,
             error_type: error.constructor.name,
             stack_trace: error.stack
-          }
+          } as any
         },
         executionTime,
         context

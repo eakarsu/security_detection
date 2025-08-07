@@ -1,13 +1,15 @@
-import { Repository, SelectQueryBuilder, FindOptionsWhere, FindManyOptions, FindOneOptions } from 'typeorm';
+import { Repository, SelectQueryBuilder, FindOptionsWhere, FindManyOptions, FindOneOptions, EntityTarget, DataSource } from 'typeorm';
 import { Injectable, Inject } from '@nestjs/common';
 import { Request } from 'express';
 
 @Injectable()
 export abstract class BaseTenantRepository<T> extends Repository<T> {
   constructor(
+    target: EntityTarget<T>,
+    dataSource: DataSource,
     @Inject('REQUEST') private readonly request: Request
   ) {
-    super();
+    super(target, dataSource.createEntityManager());
   }
 
   /**
@@ -71,7 +73,7 @@ export abstract class BaseTenantRepository<T> extends Repository<T> {
       if (options.where) {
         options.where = this.addTenantFilter(options.where);
       } else {
-        options.where = { tenant_id: this.getCurrentTenantId() } as FindOptionsWhere<T>;
+        options.where = { tenant_id: this.getCurrentTenantId() } as unknown as FindOptionsWhere<T>;
       }
     }
     
@@ -87,7 +89,7 @@ export abstract class BaseTenantRepository<T> extends Repository<T> {
       if (options.where) {
         options.where = this.addTenantFilter(options.where);
       } else {
-        options.where = { tenant_id: this.getCurrentTenantId() } as FindOptionsWhere<T>;
+        options.where = { tenant_id: this.getCurrentTenantId() } as unknown as FindOptionsWhere<T>;
       }
     }
     
@@ -128,7 +130,7 @@ export abstract class BaseTenantRepository<T> extends Repository<T> {
       if (options.where) {
         options.where = this.addTenantFilter(options.where);
       } else {
-        options.where = { tenant_id: this.getCurrentTenantId() } as FindOptionsWhere<T>;
+        options.where = { tenant_id: this.getCurrentTenantId() } as unknown as FindOptionsWhere<T>;
       }
     }
     
@@ -202,7 +204,7 @@ export abstract class BaseTenantRepository<T> extends Repository<T> {
    * Get entity with access check
    */
   async findOneWithAccess(id: string): Promise<T | null> {
-    const entity = await this.findOneBy({ id } as FindOptionsWhere<T>);
+    const entity = await this.findOneBy({ id } as unknown as FindOptionsWhere<T>);
     
     if (!entity) {
       return null;

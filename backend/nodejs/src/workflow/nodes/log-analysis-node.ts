@@ -195,11 +195,13 @@ export class LogAnalysisNode extends SecurityNode {
         {
           name: 'time_range',
           type: 'object' as const,
+          required: true,
           description: 'Time range for log analysis'
         },
         {
           name: 'context_data',
           type: 'object' as const,
+          required: false,
           description: 'Additional context for analysis'
         }
       ],

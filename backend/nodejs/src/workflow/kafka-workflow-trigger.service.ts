@@ -13,7 +13,7 @@ export class KafkaWorkflowTriggerService implements OnModuleInit, OnModuleDestro
   constructor(private readonly workflowService: WorkflowService) {
     this.kafka = new Kafka({
       clientId: 'workflow-trigger-service',
-      brokers: [process.env.KAFKA_BROKERS || 'localhost:9092'],
+      brokers: [process.env.KAFKA_BOOTSTRAP_SERVERS || process.env.KAFKA_BROKERS || 'kafka:29092'],
     });
     
     // Consumer for system events (security.events topic)

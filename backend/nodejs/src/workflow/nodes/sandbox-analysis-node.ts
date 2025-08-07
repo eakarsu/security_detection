@@ -210,17 +210,20 @@ export class SandboxAnalysisNode extends SecurityNode {
         {
           name: 'samples',
           type: 'array' as const,
-          description: 'File samples to analyze in sandbox'
+          description: 'File samples to analyze in sandbox',
+          required: true
         },
         {
           name: 'analysis_profile',
           type: 'string' as const,
-          description: 'Predefined analysis profile'
+          description: 'Predefined analysis profile',
+          required: true
         },
         {
           name: 'priority',
           type: 'string' as const,
-          description: 'Analysis priority level'
+          description: 'Analysis priority level',
+          required: true
         }
       ],
       outputs: [

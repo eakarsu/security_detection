@@ -161,9 +161,9 @@ export class MitreIntegrationService {
       techniques,
       tactics,
       kill_chain_phases: killChainPhases,
-      threat_actors,
-      detection_recommendations,
-      mitigation_recommendations
+      threat_actors: threatActors,
+      detection_recommendations: detectionRecommendations,
+      mitigation_recommendations: mitigationRecommendations
     };
   }
 

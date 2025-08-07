@@ -412,12 +412,17 @@ class KafkaService:
                     consumer = KafkaConsumer(
                         'security.events',
                         bootstrap_servers=[self.bootstrap_servers],
-                        group_id='nodeguard-security-processor',
+                        group_id='nodeguard-security-processor-v2',
                         value_deserializer=lambda m: json.loads(m.decode('utf-8')),
                         key_deserializer=lambda k: k.decode('utf-8') if k else None,
                         auto_offset_reset='latest',
                         enable_auto_commit=True,
-                        consumer_timeout_ms=1000
+                        consumer_timeout_ms=5000,
+                        request_timeout_ms=30000,
+                        session_timeout_ms=30000,
+                        heartbeat_interval_ms=3000,
+                        max_poll_records=10,
+                        fetch_max_wait_ms=500
                     )
                     
                     logger.info("Security event consumer started")

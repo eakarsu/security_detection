@@ -12,7 +12,8 @@ export class TenantThreatIntelRepository extends BaseTenantRepository<ThreatInte
     private threatIntelRepository: Repository<ThreatIntelligence>,
     @Inject('REQUEST') request: Request
   ) {
-    super(request);
+    super(ThreatIntelligence, threatIntelRepository.manager, null);
+    this.setTenantId(this.extractTenantFromRequest(request));
     Object.setPrototypeOf(this, threatIntelRepository);
     Object.assign(this, threatIntelRepository);
   }
@@ -150,7 +151,8 @@ export class TenantMitreAttackRepository extends BaseTenantRepository<MitreAttac
     private mitreRepository: Repository<MitreAttackTechnique>,
     @Inject('REQUEST') request: Request
   ) {
-    super(request);
+    super(MitreAttackTechnique, mitreRepository.manager, null);
+    this.setTenantId(this.extractTenantFromRequest(request));
     Object.setPrototypeOf(this, mitreRepository);
     Object.assign(this, mitreRepository);
   }
@@ -210,7 +212,8 @@ export class TenantThreatIntelSourceRepository extends BaseTenantRepository<Thre
     private sourceRepository: Repository<ThreatIntelSource>,
     @Inject('REQUEST') request: Request
   ) {
-    super(request);
+    super(ThreatIntelSource, sourceRepository.manager, null);
+    this.setTenantId(this.extractTenantFromRequest(request));
     Object.setPrototypeOf(this, sourceRepository);
     Object.assign(this, sourceRepository);
   }

@@ -338,7 +338,7 @@ export class SOARIntegrationService {
     }
   }
 
-  private validateActionParameters(
+  public validateActionParameters(
     action: SOARAction,
     parameters: Record<string, any>
   ): { valid: boolean; errors: string[] } {

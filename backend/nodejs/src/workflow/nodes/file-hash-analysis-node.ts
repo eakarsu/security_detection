@@ -149,11 +149,13 @@ export class FileHashAnalysisNode extends SecurityNode {
         {
           name: 'file_list',
           type: 'array' as const,
+          required: true,
           description: 'List of files to analyze'
         },
         {
           name: 'scan_mode',
           type: 'string' as const,
+          required: false,
           description: 'Analysis depth mode'
         }
       ],

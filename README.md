@@ -27,9 +27,11 @@ A    comprehensive cybersecurity detection system using OpenRouter API with Sonn
 ## Quick Start
 
 1. Clone the repository
-2. Install dependencies: `pip install -r requirements.txt`
-3. Configure environment variables
-4. Run with Docker Compose: `docker-compose up`
+2. Install dependencies: `./install.sh`
+3. Configure environment variables in `.env`
+4. Choose your deployment method:
+   - **Development**: `./start-local.sh` (recommended)
+   - **Production**: `./deploy.sh deploy`
 
 ## API Documentation
 

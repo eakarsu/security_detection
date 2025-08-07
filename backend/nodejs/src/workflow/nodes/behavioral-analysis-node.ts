@@ -110,16 +110,19 @@ export class BehavioralAnalysisNode extends SecurityNode {
         {
           name: 'entity_events',
           type: 'array' as const,
+          required: true,
           description: 'Events and activities for behavioral analysis'
         },
         {
           name: 'entity_id',
           type: 'string' as const,
+          required: true,
           description: 'Unique identifier for the entity being analyzed'
         },
         {
           name: 'baseline_data',
           type: 'object' as const,
+          required: false,
           description: 'Historical baseline data for comparison'
         }
       ],

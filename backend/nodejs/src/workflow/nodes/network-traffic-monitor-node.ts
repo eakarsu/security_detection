@@ -147,17 +147,20 @@ export class NetworkTrafficMonitorNode extends SecurityNode {
         {
           name: 'network_interface',
           type: 'string' as const,
-          description: 'Network interface to monitor'
+          description: 'Network interface to monitor',
+          required: true
         },
         {
           name: 'flow_data',
           type: 'array' as const,
-          description: 'Network flow data for analysis'
+          description: 'Network flow data for analysis',
+          required: true
         },
         {
           name: 'time_range',
           type: 'object' as const,
-          description: 'Time range for traffic analysis'
+          description: 'Time range for traffic analysis',
+          required: true
         }
       ],
       outputs: [

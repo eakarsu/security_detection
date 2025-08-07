@@ -52,13 +52,13 @@ export class NodeRegistryService implements OnModuleInit {
     this.registerNode(this.threatIntelNode);
     this.registerNode(this.mitreAttackNode);
     this.registerNode(this.soarActionNode);
-    this.registerNode(this.behavioralAnalysisNode);
-    this.registerNode(this.emailAnalysisNode);
-    this.registerNode(this.fileHashAnalysisNode);
-    this.registerNode(this.networkTrafficMonitorNode);
-    this.registerNode(this.sandboxAnalysisNode);
-    this.registerNode(this.vulnerabilityScannerNode);
-    this.registerNode(this.logAnalysisNode);
+    this.registerNode(this.behavioralAnalysisNode as any);
+    this.registerNode(this.emailAnalysisNode as any);
+    this.registerNode(this.fileHashAnalysisNode as any);
+    this.registerNode(this.networkTrafficMonitorNode as any);
+    this.registerNode(this.sandboxAnalysisNode as any);
+    this.registerNode(this.vulnerabilityScannerNode as any);
+    this.registerNode(this.logAnalysisNode as any);
     
     console.log(`📦 Registered ${this.nodes.size} security nodes`);
   }
