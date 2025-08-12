@@ -1,0 +1,5 @@
+docker buildx build --platform linux/amd64,linux/arm64 --no-cache --push \
+    --build-arg REACT_APP_API_URL=https://security.orderlybite.com/api/nodejs \
+    --build-arg REACT_APP_PYTHON_API_URL=https://security.orderlybite.com/api/python \
+    --build-arg REACT_APP_FRONTEND_URL=https://security.orderlybite.com \
+    -t eakarsun4/nodeguard-security-platform .

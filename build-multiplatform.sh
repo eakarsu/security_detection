@@ -30,13 +30,10 @@ print_error() {
 }
 
 # Configuration
-REGISTRY=${REGISTRY:-""}  # Set this to your Docker Hub username (e.g., "yourusername/")
-PROJECT_NAME="security-detection"
+REGISTRY=${REGISTRY:-"eakarsun4/"}  # Set this to your Docker Hub username (e.g., "yourusername/")
+PROJECT_NAME="nodeguard-security-platform"
 VERSION=${VERSION:-"latest"}
 PLATFORMS="linux/amd64,linux/arm64"
-
-# Services to build
-SERVICES=("frontend" "nodejs-api" "python-api")
 
 # Function to check prerequisites
 check_prerequisites() {
@@ -68,40 +65,18 @@ check_prerequisites() {
     print_success "Prerequisites check completed"
 }
 
-# Function to build a service
-build_service() {
-    local service=$1
-    local context_path=""
-    local dockerfile_path=""
-    local image_name="${REGISTRY}${PROJECT_NAME}-${service}:${VERSION}"
+# Function to build unified image
+build_unified_image() {
+    local image_name="${REGISTRY}${PROJECT_NAME}:${VERSION}"
     
-    case $service in
-        "frontend")
-            context_path="./frontend"
-            dockerfile_path="./frontend/Dockerfile"
-            ;;
-        "nodejs-api")
-            context_path="./backend/nodejs"
-            dockerfile_path="./backend/nodejs/Dockerfile"
-            ;;
-        "python-api")
-            context_path="./backend/python"
-            dockerfile_path="./backend/python/Dockerfile"
-            ;;
-        *)
-            print_error "Unknown service: $service"
-            return 1
-            ;;
-    esac
-    
-    print_status "Building $service for platforms: $PLATFORMS"
+    print_status "Building unified NodeGuard Security Platform for platforms: $PLATFORMS"
     print_status "Image: $image_name"
-    print_status "Context: $context_path"
-    print_status "Dockerfile: $dockerfile_path"
+    print_status "Context: ."
+    print_status "Dockerfile: ./Dockerfile"
     
     # Build command
     local build_args="--platform $PLATFORMS"
-    build_args="$build_args --file $dockerfile_path"
+    build_args="$build_args --file ./Dockerfile"
     build_args="$build_args --tag $image_name"
     build_args="$build_args --progress=plain"
     
@@ -114,63 +89,73 @@ build_service() {
     fi
     
     # Execute build
-    if docker buildx build $build_args $context_path; then
-        print_success "Successfully built $service"
+    if docker buildx build $build_args .; then
+        print_success "Successfully built unified NodeGuard Security Platform"
     else
-        print_error "Failed to build $service"
+        print_error "Failed to build unified image"
         return 1
     fi
 }
 
-# Function to test built images
-test_images() {
-    print_status "Testing built images..."
+# Function to test built image
+test_image() {
+    print_status "Testing built image..."
     
-    for service in "${SERVICES[@]}"; do
-        local image_name="${REGISTRY}${PROJECT_NAME}-${service}:${VERSION}"
+    local image_name="${REGISTRY}${PROJECT_NAME}:${VERSION}"
+    
+    print_status "Testing unified image..."
+    
+    # Test if image exists locally
+    if docker image inspect "$image_name" >/dev/null 2>&1; then
+        print_success "Unified image exists locally"
         
-        print_status "Testing $service image..."
-        
-        # Test if image exists locally
-        if docker image inspect "$image_name" >/dev/null 2>&1; then
-            print_success "$service image exists locally"
-        else
-            print_warning "$service image not found locally (might be in registry only)"
-        fi
-    done
+        # Get image size
+        local image_size=$(docker image inspect "$image_name" --format='{{.Size}}' | numfmt --to=iec-i --suffix=B)
+        print_status "Image size: $image_size"
+    else
+        print_warning "Image not found locally (might be in registry only)"
+    fi
 }
 
 # Function to show build summary
 show_summary() {
     echo ""
     echo "=============================================="
-    print_success "Multi-Platform Build Summary"
+    print_success "Unified Multi-Platform Build Summary"
     echo "=============================================="
     echo ""
     
-    print_status "Built Images:"
-    for service in "${SERVICES[@]}"; do
-        local image_name="${REGISTRY}${PROJECT_NAME}-${service}:${VERSION}"
-        echo "  📦 $image_name"
-    done
+    local image_name="${REGISTRY}${PROJECT_NAME}:${VERSION}"
+    print_status "Built Image:"
+    echo "  📦 $image_name"
+    
+    echo ""
+    print_status "Contains Services:"
+    echo "  🌐 Frontend (React) - Port 3000"
+    echo "  🐍 Python API (FastAPI) - Port 8000"
+    echo "  🟢 Node.js API (NestJS) - Port 3001"
     
     echo ""
     print_status "Supported Platforms:"
-    echo "  🖥️  linux/amd64   (Linux Intel/AMD, runs on macOS Intel via Docker)"
-    echo "  🦾  linux/arm64   (Linux ARM - Raspberry Pi, AWS Graviton, runs on macOS M1/M2/M3 via Docker)"
+    echo "  🖥️  linux/amd64   (Linux Intel/AMD, runs on macOS via Docker Desktop)"
+    echo "  🦾  linux/arm64   (Linux ARM - Raspberry Pi, AWS Graviton, Apple Silicon via Docker Desktop)"
     
     echo ""
     print_status "Deployment Options:"
     echo "  🐳 Docker Compose:  docker-compose -f docker-compose.prod.yml up -d"
+    echo "  🚀 Direct Run:      docker run -p 3000:3000 -p 3001:3001 -p 8000:8000 $image_name"
     echo "  ⚡ Quick Deploy:    ./deploy.sh deploy"
-    echo "  🚀 Local Dev:       ./start-local.sh"
     
     if [ "$PUSH" = "true" ]; then
         echo ""
-        print_success "Images pushed to registry and ready for deployment!"
+        print_success "Image pushed to registry and ready for deployment!"
+        echo ""
+        print_status "Usage from Registry:"
+        echo "  docker pull $image_name"
+        echo "  docker run -d -p 3000:3000 -p 3001:3001 -p 8000:8000 $image_name"
     else
         echo ""
-        print_warning "Images built locally only. Use PUSH=true to push to registry."
+        print_warning "Image built locally only. Use --push to push to registry."
     fi
 }
 
@@ -185,17 +170,12 @@ main() {
     
     # Parse command line arguments
     PUSH=${PUSH:-false}
-    SPECIFIC_SERVICE=""
     
     while [[ $# -gt 0 ]]; do
         case $1 in
             --push)
                 PUSH=true
                 shift
-                ;;
-            --service)
-                SPECIFIC_SERVICE="$2"
-                shift 2
                 ;;
             --version)
                 VERSION="$2"
@@ -212,9 +192,10 @@ main() {
             --help|-h)
                 echo "Usage: $0 [OPTIONS]"
                 echo ""
+                echo "NodeGuard AI Security Platform - Unified Multi-Platform Docker Build"
+                echo ""
                 echo "Options:"
-                echo "  --push                 Push images to registry after building"
-                echo "  --service SERVICE      Build only specific service (frontend, nodejs-api, python-api)"
+                echo "  --push                 Push image to registry after building"
                 echo "  --version VERSION      Image version tag (default: latest)"
                 echo "  --registry REGISTRY    Docker registry prefix (default: none)"
                 echo "  --platforms PLATFORMS  Target platforms (default: linux/amd64,linux/arm64)"
@@ -226,10 +207,10 @@ main() {
                 echo "  REGISTRY=myregistry/  Same as --registry myregistry/"
                 echo ""
                 echo "Examples:"
-                echo "  $0                                    # Build all services locally"
+                echo "  $0                                    # Build unified image locally"
                 echo "  $0 --push --version v1.0.0          # Build and push with version tag"
-                echo "  $0 --service frontend                # Build only frontend"
                 echo "  $0 --registry myregistry.com/       # Use custom registry"
+                echo "  REGISTRY=johndoe/ $0 --push          # Build and push using environment variable"
                 exit 0
                 ;;
             *)
@@ -245,34 +226,19 @@ main() {
     echo "  Registry: ${REGISTRY:-"(none - local build)"}"
     echo "  Platforms: $PLATFORMS"
     echo "  Push to registry: $PUSH"
-    echo "  Specific service: ${SPECIFIC_SERVICE:-"(all services)"}"
     echo ""
     
     # Check prerequisites
     check_prerequisites
     
-    # Build services
-    if [ -n "$SPECIFIC_SERVICE" ]; then
-        # Build specific service
-        if [[ " ${SERVICES[@]} " =~ " ${SPECIFIC_SERVICE} " ]]; then
-            build_service "$SPECIFIC_SERVICE"
-        else
-            print_error "Invalid service: $SPECIFIC_SERVICE"
-            print_status "Available services: ${SERVICES[*]}"
-            exit 1
-        fi
-    else
-        # Build all services
-        for service in "${SERVICES[@]}"; do
-            echo ""
-            build_service "$service"
-        done
-    fi
+    # Build unified image
+    echo ""
+    build_unified_image
     
-    # Test images if built locally
+    # Test image if built locally
     if [ "$PUSH" = "false" ]; then
         echo ""
-        test_images
+        test_image
     fi
     
     # Show summary

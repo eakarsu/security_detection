@@ -1,8 +1,13 @@
 version: '3.8'
 
+# Use custom env file name
+x-common-env: &common-env
+  env_file: .env.security
+
 services:
   # Database Services
   postgres:
+    <<: *common-env
     image: postgres:16
     restart: unless-stopped
     environment:
@@ -25,6 +30,7 @@ services:
       retries: 3
 
   redis:
+    <<: *common-env
     image: redis:7-alpine
     restart: unless-stopped
     ports:
@@ -41,6 +47,7 @@ services:
       retries: 3
 
   elasticsearch:
+    <<: *common-env
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
     restart: unless-stopped
     environment:
@@ -69,6 +76,7 @@ services:
 
   # Message Queue
   zookeeper:
+    <<: *common-env
     image: confluentinc/cp-zookeeper:7.7.0
     restart: unless-stopped
     platform: linux/amd64
@@ -91,6 +99,7 @@ services:
       retries: 5
 
   kafka:
+    <<: *common-env
     image: confluentinc/cp-kafka:7.7.0
     restart: unless-stopped
     platform: linux/amd64
@@ -129,17 +138,19 @@ services:
   # Unified NodeGuard Security Platform
   # Single container with Frontend, Python API, and Node.js API
   nodeguard-platform:
+    <<: *common-env
     build:
       context: .
       dockerfile: Dockerfile
-      platforms:
-        - linux/amd64
-        - linux/arm64
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        REACT_APP_PYTHON_API_URL: ${REACT_APP_PYTHON_API_URL}
+        REACT_APP_FRONTEND_URL: ${REACT_APP_FRONTEND_URL:-http://localhost:3000}
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"      # Frontend (React)
-      - "${NODEJS_API_PORT:-3001}:3001"    # Node.js API
-      - "${PYTHON_API_PORT:-8000}:8000"    # Python API
+      - "${FRONTEND_PORT:-3002}:3000"      # Frontend (React)
+      - "${NODEJS_API_PORT:-3003}:3001"    # Node.js API
+      - "${PYTHON_API_PORT:-8001}:8000"    # Python API
     environment:
       # Database Configuration
       - DATABASE_URL=postgresql://${POSTGRES_USER:-nodeguard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodeguard}
@@ -180,8 +191,8 @@ services:
       - API_PORT=3001
       
       # Frontend Configuration
-      - REACT_APP_API_URL=http://localhost:${NODEJS_API_PORT:-3001}
-      - REACT_APP_PYTHON_API_URL=http://localhost:${PYTHON_API_PORT:-8000}
+      - REACT_APP_API_URL=http://localhost:3003
+      - REACT_APP_PYTHON_API_URL=http://localhost:8001
     depends_on:
       postgres:
         condition: service_healthy
@@ -210,42 +221,29 @@ services:
       start_period: 60s
       retries: 3
 
-  # Monitoring
-  prometheus:
-    image: prom/prometheus:v2.48.1
-    restart: unless-stopped
-    ports:
-      - "${PROMETHEUS_PORT:-9090}:9090"
-    volumes:
-      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    networks:
-      - security-network
+  # Monitoring (disabled for production - uncomment if needed)
+  # prometheus:
+  #   image: prom/prometheus:v2.48.1
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${PROMETHEUS_PORT:-9090}:9090"
+  #   volumes:
+  #     - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #     - prometheus_data:/prometheus
+  #   networks:
+  #     - security-network
 
-  grafana:
-    image: grafana/grafana:10.2.3
-    restart: unless-stopped
-    ports:
-      - "${GRAFANA_PORT:-3002}:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SECURITY_COOKIE_SECURE=true
-      - GF_SECURITY_COOKIE_SAMESITE=strict
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./infrastructure/monitoring/grafana:/etc/grafana/provisioning:ro
-    depends_on:
-      - prometheus
-    networks:
-      - security-network
+  # grafana:
+  #   image: grafana/grafana:10.2.3
+  #   restart: unless-stopped  
+  #   ports:
+  #     - "${GRAFANA_PORT:-3002}:3000"
+  #   environment:
+  #     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #   networks:
+  #     - security-network
 
 volumes:
   postgres_data:
