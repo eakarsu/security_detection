@@ -139,13 +139,7 @@ services:
   # Single container with Frontend, Python API, and Node.js API
   nodeguard-platform:
     <<: *common-env
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL}
-        REACT_APP_PYTHON_API_URL: ${REACT_APP_PYTHON_API_URL}
-        REACT_APP_FRONTEND_URL: ${REACT_APP_FRONTEND_URL:-http://localhost:3000}
+    image: eakarsun4/nodeguard-security-platform:latest
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3002}:3000"      # Frontend (React)

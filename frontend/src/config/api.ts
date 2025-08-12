@@ -1,5 +1,5 @@
 // API Configuration for NodeGuard Frontend
-// Automatically detects local development vs Docker container mode
+// Supports both build-time and runtime configuration
 
 interface ApiConfig {
   pythonApiUrl: string;
@@ -7,25 +7,59 @@ interface ApiConfig {
   frontendUrl: string;
 }
 
-const getApiConfig = (): ApiConfig => {
-  // All URLs must come from environment variables - no hardcoded ports!
-  // React environment variables are injected at build time
-  const pythonApiUrl = process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:8000';
-  const nodejsApiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-  const frontendUrl = process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000';
+let API_CONFIG: ApiConfig | null = null;
 
-  return {
-    pythonApiUrl,
-    nodejsApiUrl,
-    frontendUrl
-  };
+// Initialize configuration from runtime API
+export const initializeConfig = async (): Promise<ApiConfig> => {
+  if (API_CONFIG) return API_CONFIG;
+  
+  try {
+    // Fetch runtime config from Node.js API
+    const response = await fetch('/api/config');
+    if (response.ok) {
+      API_CONFIG = await response.json();
+      console.log('🔧 Runtime API Configuration loaded:', API_CONFIG);
+      return API_CONFIG;
+    }
+    throw new Error('Failed to fetch runtime config');
+  } catch (error) {
+    console.warn('Failed to load runtime config, using build-time defaults:', error);
+    // Fallback to build-time environment variables
+    API_CONFIG = {
+      pythonApiUrl: process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:8000',
+      nodejsApiUrl: process.env.REACT_APP_API_URL || 'http://localhost:3001',
+      frontendUrl: process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000'
+    };
+    console.log('🔧 Build-time API Configuration used:', API_CONFIG);
+    return API_CONFIG;
+  }
 };
 
-export const API_CONFIG = getApiConfig();
+// Get current configuration (must be initialized first)
+export const getApiConfig = (): ApiConfig => {
+  if (!API_CONFIG) {
+    // Fallback to build-time config if not initialized
+    console.warn('API Config not initialized, using build-time fallback');
+    return {
+      pythonApiUrl: process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:8000',
+      nodejsApiUrl: process.env.REACT_APP_API_URL || 'http://localhost:3001',
+      frontendUrl: process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000'
+    };
+  }
+  return API_CONFIG;
+};
+
+// Legacy export for backward compatibility
+export const API_CONFIG_SYNC = {
+  get pythonApiUrl() { return getApiConfig().pythonApiUrl; },
+  get nodejsApiUrl() { return getApiConfig().nodejsApiUrl; },
+  get frontendUrl() { return getApiConfig().frontendUrl; }
+};
 
 // Helper functions for common API endpoints
 export const getApiEndpoint = (endpoint: string, service: 'python' | 'nodejs' = 'python') => {
-  const baseUrl = service === 'python' ? API_CONFIG.pythonApiUrl : API_CONFIG.nodejsApiUrl;
+  const config = getApiConfig();
+  const baseUrl = service === 'python' ? config.pythonApiUrl : config.nodejsApiUrl;
   return `${baseUrl}${endpoint}`;
 };
 
@@ -48,12 +82,4 @@ export const ENDPOINTS = {
   status: () => getApiEndpoint('/api/v1/status', 'nodejs'),
 };
 
-// Debug logging in development
-if (window.location.hostname === 'localhost') {
-  console.log('🔧 API Configuration:', {
-    mode: (window as any).REACT_APP_LOCAL_DEV_MODE === 'true' ? 'Local Development' : 'Docker Containers',
-    pythonApi: API_CONFIG.pythonApiUrl,
-    nodejsApi: API_CONFIG.nodejsApiUrl,
-    frontend: API_CONFIG.frontendUrl
-  });
-}
+// Debug logging will be handled by initializeConfig function

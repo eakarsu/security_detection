@@ -24,4 +24,15 @@ export class AppController {
   } {
     return this.appService.getStatus();
   }
+
+  @Get('api/config')
+  @ApiOperation({ summary: 'Get runtime configuration for frontend' })
+  @ApiResponse({ status: 200, description: 'Frontend configuration' })
+  getConfig(): {
+    pythonApiUrl: string;
+    nodejsApiUrl: string;
+    frontendUrl: string;
+  } {
+    return this.appService.getConfig();
+  }
 }

@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box } from '@mui/material';
 import { Toaster } from 'react-hot-toast';
 import { HelmetProvider } from 'react-helmet-async';
+
+// Configuration
+import { initializeConfig } from './config/api.ts';
 
 // Components
 import Navbar from './components/common/Navbar.tsx';
@@ -163,36 +166,62 @@ const AppContent: React.FC = () => {
   );
 };
 
+const ConfigInitializer: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [configLoaded, setConfigLoaded] = useState(false);
+
+  useEffect(() => {
+    const initConfig = async () => {
+      try {
+        await initializeConfig();
+      } catch (error) {
+        console.error('Failed to initialize configuration:', error);
+      } finally {
+        setConfigLoaded(true);
+      }
+    };
+
+    initConfig();
+  }, []);
+
+  if (!configLoaded) {
+    return <LoadingSpinner message="Loading configuration..." />;
+  }
+
+  return <>{children}</>;
+};
+
 const App: React.FC = () => {
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <Router>
-            <AppContent />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#1a1d3a',
-                  color: '#ffffff',
-                  border: '1px solid #2196f3',
-                },
-                success: {
+          <ConfigInitializer>
+            <Router>
+              <AppContent />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
                   style: {
-                    border: '1px solid #4caf50',
+                    background: '#1a1d3a',
+                    color: '#ffffff',
+                    border: '1px solid #2196f3',
                   },
-                },
-                error: {
-                  style: {
-                    border: '1px solid #f44336',
+                  success: {
+                    style: {
+                      border: '1px solid #4caf50',
+                    },
                   },
-                },
-              }}
-            />
-          </Router>
+                  error: {
+                    style: {
+                      border: '1px solid #f44336',
+                    },
+                  },
+                }}
+              />
+            </Router>
+          </ConfigInitializer>
         </ThemeProvider>
       </QueryClientProvider>
     </HelmetProvider>
