@@ -68,7 +68,7 @@ export const ENDPOINTS = {
   // Python API endpoints
   incidents: () => getApiEndpoint('/api/incidents', 'python'),
   threatIntel: () => getApiEndpoint('/api/threat-intel', 'python'),
-  compliance: () => getApiEndpoint('/api/compliance', 'python'),
+  compliance: () => getApiEndpoint('/api/compliance/', 'python'),
   detection: () => getApiEndpoint('/api/detection', 'python'),
   ml: () => getApiEndpoint('/api/ml', 'python'),
   dashboard: () => getApiEndpoint('/api/dashboard', 'python'),

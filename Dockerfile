@@ -37,6 +37,8 @@ RUN apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     python3-venv \
+    netcat-openbsd \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/* && apt-get clean
 
 # Create Python virtual environment with proper error handling
@@ -82,6 +84,9 @@ RUN npm install -g serve
 # Copy ML models
 COPY models/ ./models/
 
+# Copy database seed scripts
+COPY scripts/setup/ ./scripts/setup/
+
 # Create necessary directories
 RUN mkdir -p /app/logs /app/data/workflows
 
@@ -91,6 +96,17 @@ COPY <<EOF /etc/supervisor/conf.d/supervisord.conf
 nodaemon=true
 user=root
 
+[program:db-seeder]
+command=/app/seed-database.sh
+directory=/app
+autostart=true
+autorestart=false
+startsecs=0
+exitcodes=0
+stderr_logfile=/app/logs/db-seeder.log
+stdout_logfile=/app/logs/db-seeder.log
+priority=1
+
 [program:python-api]
 command=/app/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 directory=/app/backend/python
@@ -98,6 +114,7 @@ autostart=true
 autorestart=true
 stderr_logfile=/app/logs/python-api.log
 stdout_logfile=/app/logs/python-api.log
+priority=10
 
 [program:nodejs-api]
 command=node dist/index.js
@@ -107,6 +124,7 @@ autorestart=true
 stderr_logfile=/app/logs/nodejs-api.log
 stdout_logfile=/app/logs/nodejs-api.log
 environment=NODE_ENV=production,API_PORT=3001
+priority=10
 
 [program:frontend]
 command=serve -s /app/frontend/build -l 3000
@@ -115,7 +133,34 @@ autostart=true
 autorestart=true
 stderr_logfile=/app/logs/frontend.log
 stdout_logfile=/app/logs/frontend.log
+priority=20
 EOF
+
+# Database seeding script
+COPY <<EOF /app/seed-database.sh
+#!/bin/bash
+echo "Waiting for database to be ready..."
+# Wait for database to be available
+while ! nc -z postgres 5432; do
+  echo "Waiting for database..."
+  sleep 2
+done
+
+echo "Database is ready. Starting seeding process..."
+sleep 5
+
+# Run database seeding
+echo "Running seed script: /app/scripts/setup/seed_security_data.sql"
+PGPASSWORD=\${POSTGRES_PASSWORD} psql -h postgres -U \${POSTGRES_USER:-nodeguard} -d \${POSTGRES_DB:-nodeguard} -f /app/scripts/setup/seed_security_data.sql
+
+if [ \$? -eq 0 ]; then
+    echo "Database seeding completed successfully!"
+else
+    echo "Database seeding failed!"
+    exit 1
+fi
+EOF
+RUN chmod +x /app/seed-database.sh
 
 # Health check script
 COPY <<EOF /app/health-check.sh
