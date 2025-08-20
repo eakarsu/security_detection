@@ -7,17 +7,23 @@ export class WorkflowTriggerService {
   private readonly logger = new Logger(WorkflowTriggerService.name);
   private lastCheckedTime: Date = new Date();
   private intervalId: NodeJS.Timeout | null = null;
+  private readonly monitoringEnabled = process.env.WORKFLOW_MONITORING_ENABLED === 'true';
+  private readonly monitoringInterval = parseInt(process.env.WORKFLOW_MONITORING_INTERVAL || '300000'); // Default 5 minutes
 
   constructor(private readonly workflowService: WorkflowService) {}
 
   async startMonitoring() {
-    this.logger.log('Starting workflow trigger monitoring');
+    if (!this.monitoringEnabled) {
+      this.logger.log('Workflow trigger monitoring is disabled via WORKFLOW_MONITORING_ENABLED environment variable');
+      return;
+    }
+
+    this.logger.log(`Starting workflow trigger monitoring (interval: ${this.monitoringInterval}ms)`);
     this.lastCheckedTime = new Date();
     
-    // Check for new incidents every 10 seconds
     this.intervalId = setInterval(async () => {
       await this.checkForNewIncidents();
-    }, 10000);
+    }, this.monitoringInterval);
   }
 
   async stopMonitoring() {

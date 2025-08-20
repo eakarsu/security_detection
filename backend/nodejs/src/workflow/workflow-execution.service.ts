@@ -22,6 +22,9 @@ export interface NodeExecutionResult {
 @Injectable()
 export class WorkflowExecutionService {
   private readonly logger = new Logger(WorkflowExecutionService.name);
+  private aiCallTimes: Map<string, number[]> = new Map();
+  private readonly aiRateLimitWindow = 60000; // 1 minute window
+  private readonly aiMaxCallsPerWindow = 5; // Max 5 AI calls per minute
 
   async executeWorkflow(workflow: Workflow, inputData: any): Promise<any> {
     const executionId = Date.now().toString();
@@ -252,7 +255,30 @@ export class WorkflowExecutionService {
     const config = node.data?.config || {};
     const inputData = context.inputData.event || context.inputData;
     
+    // Check rate limit before making AI call
+    if (!this.checkAiRateLimit(context.workflowId)) {
+      this.logger.warn('AI analysis rate limit exceeded, using cached/fallback analysis', {
+        workflowId: context.workflowId,
+        nodeId: node.id
+      });
+      
+      return {
+        model: 'rate_limited',
+        analysisType: 'cached',
+        analysis: `Rate limit exceeded. Basic threat analysis: ${inputData.threat_type || 'Unknown'}. Risk score: ${inputData.risk_score || 0}`,
+        recommendations: ['Review incident manually', 'Check for false positives'],
+        confidence: 0.6,
+        threatLevel: inputData.severity?.toLowerCase() || 'medium',
+        indicators: [inputData.source_ip, inputData.threat_type].filter(Boolean),
+        processingTime: 0.001,
+        rateLimited: true
+      };
+    }
+    
     try {
+      // Record AI call attempt
+      this.recordAiCall(context.workflowId);
+      
       // Call Python AI analysis API
       const pythonApiUrl = process.env.PYTHON_API_URL || 'http://localhost:8010';
       const response = await axios.post(`${pythonApiUrl}/api/ai/analyze`, {
@@ -713,5 +739,26 @@ export class WorkflowExecutionService {
     if (riskScore >= 7.0) return 'high';
     if (riskScore >= 5.0) return 'medium';
     return 'low';
+  }
+
+  private checkAiRateLimit(workflowId: string): boolean {
+    const now = Date.now();
+    const calls = this.aiCallTimes.get(workflowId) || [];
+    
+    // Remove calls older than the rate limit window
+    const recentCalls = calls.filter(callTime => now - callTime < this.aiRateLimitWindow);
+    
+    // Update the stored calls
+    this.aiCallTimes.set(workflowId, recentCalls);
+    
+    // Check if we're under the limit
+    return recentCalls.length < this.aiMaxCallsPerWindow;
+  }
+
+  private recordAiCall(workflowId: string): void {
+    const now = Date.now();
+    const calls = this.aiCallTimes.get(workflowId) || [];
+    calls.push(now);
+    this.aiCallTimes.set(workflowId, calls);
   }
 }
