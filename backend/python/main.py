@@ -110,12 +110,16 @@ async def lifespan(app: FastAPI):
             if not LocalDevSettings.LOCAL_DEV_MODE:
                 raise
         
-        # Start background tasks only if services are available
-        if kafka_service and not LocalDevSettings.DISABLE_EXTERNAL_SERVICES:
+        # Background tasks controlled by environment variables
+        if (config.ENABLE_THREAT_DETECTION_PIPELINE and 
+            kafka_service and not LocalDevSettings.DISABLE_EXTERNAL_SERVICES):
             asyncio.create_task(start_threat_detection_pipeline())
+            logger.info("Threat detection pipeline enabled")
         
-        if ml_service and not LocalDevSettings.SKIP_MODEL_TRAINING:
+        if (config.ENABLE_MODEL_TRAINING_SCHEDULER and 
+            ml_service and not LocalDevSettings.SKIP_MODEL_TRAINING):
             asyncio.create_task(start_model_training_scheduler())
+            logger.info("Model training scheduler enabled")
         
         logger.info("All available services initialized successfully")
         
@@ -254,7 +258,7 @@ async def start_threat_detection_pipeline():
             if kafka_service and kafka_service.is_connected():
                 await kafka_service.process_security_events()
             
-            await asyncio.sleep(1)  # Process every second
+            await asyncio.sleep(config.THREAT_DETECTION_INTERVAL)  # Configurable interval
             
         except Exception as e:
             logger.error("Error in threat detection pipeline", error=str(e))

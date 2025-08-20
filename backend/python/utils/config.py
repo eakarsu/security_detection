@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     MAX_TOKENS: int = Field(default=4096, env="MAX_TOKENS")
     TEMPERATURE: float = Field(default=0.1, env="TEMPERATURE")
     
+    # Background Task Configuration
+    ENABLE_THREAT_DETECTION_PIPELINE: bool = Field(default=False, env="ENABLE_THREAT_DETECTION_PIPELINE")
+    ENABLE_MODEL_TRAINING_SCHEDULER: bool = Field(default=False, env="ENABLE_MODEL_TRAINING_SCHEDULER")
+    THREAT_DETECTION_INTERVAL: int = Field(default=60, env="THREAT_DETECTION_INTERVAL")  # seconds
+    
     # Security Configuration
     JWT_SECRET: str = Field(env="JWT_SECRET")
     JWT_EXPIRATION: str = Field(default="24h", env="JWT_EXPIRATION")
