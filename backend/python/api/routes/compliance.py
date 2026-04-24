@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import structlog
 import random
 from datetime import datetime, timedelta
+from ..schemas.pagination import paginate
 
 logger = structlog.get_logger(__name__)
 
@@ -57,9 +58,13 @@ class ComplianceControl(BaseModel):
     remediation: str
 
 
-@router.get("/", response_model=Dict[str, Any])
-async def get_compliance_overview() -> Dict[str, Any]:
-    """Get compliance overview with reports, frameworks, and controls"""
+@router.get("/")
+async def get_compliance_overview(
+    page: int = 1,
+    page_size: int = 20,
+    search: Optional[str] = None
+) -> Dict[str, Any]:
+    """Get compliance overview with reports, frameworks, and controls (paginated)"""
     try:
         # Mock compliance frameworks
         frameworks = [
@@ -205,12 +210,34 @@ async def get_compliance_overview() -> Dict[str, Any]:
                 )
                 controls.append(control)
         
+        # Apply search filter to controls if provided
+        if search:
+            search_lower = search.lower()
+            controls = [
+                c for c in controls
+                if search_lower in c.title.lower()
+                or search_lower in c.description.lower()
+                or search_lower in c.control_id.lower()
+                or search_lower in c.framework.lower()
+            ]
+
+        # Paginate controls
+        total_controls = len(controls)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_controls = controls[start:end]
+
         return {
             "frameworks": [framework.dict() for framework in frameworks],
             "reports": [report.dict() for report in reports],
-            "controls": [control.dict() for control in controls[:20]]  # Limit for performance
+            "controls": paginate(
+                items=[control.dict() for control in paginated_controls],
+                total=total_controls,
+                page=page,
+                page_size=page_size
+            )
         }
-        
+
     except Exception as e:
         logger.error("Error retrieving compliance overview", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve compliance data")

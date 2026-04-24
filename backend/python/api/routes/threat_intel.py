@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
 from ..services.database import get_database_service
+from ..schemas.pagination import paginate
 
 logger = structlog.get_logger(__name__)
 
@@ -41,24 +42,47 @@ class ThreatFeed(BaseModel):
     feed_type: str
 
 
-@router.get("", response_model=Dict[str, Any])
-@router.get("/", response_model=Dict[str, Any])
+@router.get("")
+@router.get("/")
 async def get_threat_intelligence(
     type: Optional[str] = None,
     severity: Optional[str] = None,
     search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
     limit: int = 100
 ) -> Dict[str, Any]:
-    """Get threat intelligence data including indicators and feeds"""
+    """Get threat intelligence data including indicators and feeds with pagination"""
     try:
         # Get database service and connection
         db_service = await get_database_service()
         await db_service.ensure_connected()
         connection_context = await db_service.get_connection_context()
         async with connection_context as conn:
-            # Build query with filters
-            query = """
-                SELECT 
+            # Build base WHERE clause
+            where_clause = "WHERE is_active = true"
+            params = []
+
+            if type:
+                params.append(type)
+                where_clause += " AND indicator_type = $" + str(len(params))
+
+            if search:
+                search_pattern = f"%{search}%"
+                p = len(params)
+                params.extend([search_pattern, search_pattern])
+                where_clause += f" AND (indicator_value ILIKE ${p+1} OR description ILIKE ${p+2})"
+
+            # Count query for pagination
+            count_query = f"SELECT COUNT(*) FROM security.threat_intel {where_clause}"
+            total = await conn.fetchval(count_query, *params)
+
+            # Data query with pagination
+            offset = (page - 1) * page_size
+            params.append(page_size)
+            params.append(offset)
+            query = f"""
+                SELECT
                     id,
                     indicator_type,
                     indicator_value,
@@ -71,23 +95,13 @@ async def get_threat_intelligence(
                     is_active,
                     created_at
                 FROM security.threat_intel
-                WHERE is_active = true
+                {where_clause}
+                ORDER BY confidence_score DESC, last_seen DESC
+                LIMIT ${len(params) - 1} OFFSET ${len(params)}
             """
-            params = []
-            
-            if type:
-                query += " AND indicator_type = $" + str(len(params) + 1)
-                params.append(type)
-                
-            if search:
-                query += " AND (indicator_value ILIKE $" + str(len(params) + 1) + " OR description ILIKE $" + str(len(params) + 2) + ")"
-                params.extend([f"%{search}%", f"%{search}%"])
-                
-            query += " ORDER BY confidence_score DESC, last_seen DESC LIMIT $" + str(len(params) + 1)
-            params.append(limit)
-            
+
             rows = await conn.fetch(query, *params)
-        
+
         indicators = []
         for row in rows:
             # Map confidence score to severity
@@ -100,7 +114,7 @@ async def get_threat_intelligence(
                 severity_level = "medium"
             else:
                 severity_level = "low"
-            
+
             # Generate tags based on threat type and indicator type
             tags = [row['threat_type'], row['indicator_type']]
             if row['indicator_type'] in ['ip', 'domain', 'url']:
@@ -109,7 +123,7 @@ async def get_threat_intelligence(
                 tags.append("file")
             elif row['indicator_type'] in ['email']:
                 tags.append("email")
-                
+
             indicator = ThreatIndicator(
                 id=str(row['id']),
                 type=row['indicator_type'],
@@ -125,11 +139,11 @@ async def get_threat_intelligence(
                 is_active=row['is_active']
             )
             indicators.append(indicator)
-        
+
         # Apply severity filter after mapping
         if severity:
             indicators = [i for i in indicators if i.severity == severity]
-        
+
         # Mock threat feeds (these could also come from database in the future)
         feeds = [
             ThreatFeed(
@@ -178,12 +192,19 @@ async def get_threat_intelligence(
                 feed_type="internal"
             )
         ]
-        
+
+        paginated_indicators = paginate(
+            items=[indicator.dict() for indicator in indicators],
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+
         return {
-            "indicators": [indicator.dict() for indicator in indicators],
+            "indicators": paginated_indicators,
             "feeds": [feed.dict() for feed in feeds]
         }
-        
+
     except Exception as e:
         logger.error("Error retrieving threat intelligence", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve threat intelligence data")

@@ -17,6 +17,12 @@ import {
   Shield as ThreatIcon,
   Assessment as ComplianceIcon,
   Settings as SettingsIcon,
+  Storage as SIEMIcon,
+  Search as HuntingIcon,
+  GridView as MitreIcon,
+  Timeline as KillChainIcon,
+  Rule as DetectionIcon,
+  SmartToy as SOCAnalystIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -28,6 +34,12 @@ const menuItems = [
   { text: 'Incidents', icon: <IncidentIcon />, path: '/incidents' },
   { text: 'Threat Intel', icon: <ThreatIcon />, path: '/threat-intel' },
   { text: 'Compliance', icon: <ComplianceIcon />, path: '/compliance' },
+  { text: 'SIEM', icon: <SIEMIcon />, path: '/siem' },
+  { text: 'Threat Hunting', icon: <HuntingIcon />, path: '/hunting' },
+  { text: 'MITRE ATT&CK', icon: <MitreIcon />, path: '/mitre' },
+  { text: 'Kill Chain', icon: <KillChainIcon />, path: '/kill-chain' },
+  { text: 'Detection Rules', icon: <DetectionIcon />, path: '/detection-rules' },
+  { text: 'AI SOC Analyst', icon: <SOCAnalystIcon />, path: '/soc-analyst' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 

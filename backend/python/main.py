@@ -25,7 +25,13 @@ from api.routes import (
     response_router,
     compliance_router,
     threat_intel_router,
-    dashboard_router
+    dashboard_router,
+    export_router,
+    bulk_router,
+    siem_router,
+    hunting_router,
+    advanced_detection_router,
+    soc_analyst_router
 )
 from api.middleware import SecurityMiddleware, LoggingMiddleware
 from api.services.database import DatabaseService
@@ -185,6 +191,12 @@ app.include_router(response_router, prefix="/api/response", tags=["Security Resp
 app.include_router(compliance_router, prefix="/api/compliance", tags=["Compliance"])
 app.include_router(threat_intel_router, prefix="/api/threat-intel", tags=["Threat Intelligence"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(export_router, prefix="/api/export", tags=["Export"])
+app.include_router(bulk_router, prefix="/api/bulk", tags=["Bulk Operations"])
+app.include_router(siem_router, prefix="/api/siem", tags=["SIEM"])
+app.include_router(hunting_router, prefix="/api/hunting", tags=["Threat Hunting"])
+app.include_router(advanced_detection_router, prefix="/api/advanced-detection", tags=["Advanced Detection"])
+app.include_router(soc_analyst_router, prefix="/api/soc-analyst", tags=["AI SOC Analyst"])
 
 
 @app.get("/")

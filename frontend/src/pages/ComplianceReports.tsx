@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -6,303 +6,206 @@ import {
   Grid,
   Card,
   CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Button,
   Chip,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  TextField,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
   Alert,
   CircularProgress,
   LinearProgress,
-  IconButton,
-  Tooltip,
   Stack,
-  Divider,
   Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
-  Visibility as ViewIcon,
-  Schedule as ScheduleIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
   Info as InfoIcon,
   Security as SecurityIcon,
   Policy as PolicyIcon,
-  Gavel as GavelIcon,
   ExpandMore as ExpandMoreIcon,
-  CalendarToday as CalendarIcon,
+  Schedule as ScheduleIcon,
   TrendingUp as TrendingUpIcon,
-  Assignment as AssignmentIcon
+  CalendarToday as CalendarIcon,
+  Assignment as AssignmentIcon,
 } from '@mui/icons-material';
+import toast from 'react-hot-toast';
+import DataTable from '../components/common/DataTable.tsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.tsx';
 import { ENDPOINTS } from '../config/api.ts';
 
 interface ComplianceReport {
   id: string;
-  name: string;
   framework: string;
-  status: 'draft' | 'in_progress' | 'completed' | 'failed';
-  compliance_score: number;
-  created_at: string;
-  updated_at: string;
-  generated_by: string;
-  period_start: string;
-  period_end: string;
-  total_controls: number;
-  passed_controls: number;
-  failed_controls: number;
-  findings: ComplianceFinding[];
-}
-
-interface ComplianceFinding {
-  id: string;
-  control_id: string;
-  control_name: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  status: 'pass' | 'fail' | 'not_applicable';
-  description: string;
-  evidence: string;
-  remediation: string;
+  status: string;
+  score: number;
+  generated_at: string;
+  last_updated: string;
+  controls_total: number;
+  controls_passed: number;
+  controls_failed: number;
+  controls_warning: number;
+  findings: any[];
 }
 
 interface ComplianceFramework {
   id: string;
   name: string;
   description: string;
+  enabled: boolean;
   version: string;
-  total_controls: number;
-  categories: string[];
+  compliance_score: number;
+  status: string;
+}
+
+interface ComplianceControl {
+  id: string;
+  framework: string;
+  control_id: string;
+  title: string;
+  description: string;
+  status: string;
+  severity: string;
+  last_tested: string;
 }
 
 const ComplianceReports: React.FC = () => {
   const [reports, setReports] = useState<ComplianceReport[]>([]);
   const [frameworks, setFrameworks] = useState<ComplianceFramework[]>([]);
+  const [controls, setControls] = useState<ComplianceControl[]>([]);
+  const [totalControls, setTotalControls] = useState(0);
+  const [controlsPage, setControlsPage] = useState(1);
+  const [controlsPageSize, setControlsPageSize] = useState(20);
+  const [controlsSearch, setControlsSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<ComplianceReport | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [filterFramework, setFilterFramework] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState<string>('');
+  const [newReport, setNewReport] = useState({ name: '', framework: '', period_start: '', period_end: '', description: '' });
 
-  // Form state for creating new reports
-  const [newReport, setNewReport] = useState({
-    name: '',
-    framework: '',
-    period_start: '',
-    period_end: '',
-    description: ''
-  });
-
-  const fetchComplianceData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
-      const params = new URLSearchParams();
-      if (filterFramework) params.append('framework', filterFramework);
-      if (filterStatus) params.append('status', filterStatus);
-      
+      const params = new URLSearchParams({
+        page: String(controlsPage),
+        page_size: String(controlsPageSize),
+      });
+      if (controlsSearch) params.set('search', controlsSearch);
+
       const response = await fetch(`${ENDPOINTS.compliance()}?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch compliance data');
-      }
-      
+      if (!response.ok) throw new Error('Failed to fetch compliance data');
       const data = await response.json();
       setReports(data.reports || []);
       setFrameworks(data.frameworks || []);
+
+      // Handle paginated controls
+      if (data.controls?.data) {
+        setControls(data.controls.data);
+        setTotalControls(data.controls.total);
+      } else if (Array.isArray(data.controls)) {
+        setControls(data.controls);
+        setTotalControls(data.controls.length);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch compliance data');
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
       setLoading(false);
     }
-  };
+  }, [controlsPage, controlsPageSize, controlsSearch]);
 
-  useEffect(() => {
-    fetchComplianceData();
-  }, [filterFramework, filterStatus]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'success';
-      case 'in_progress': return 'info';
-      case 'failed': return 'error';
-      case 'draft': return 'default';
+      case 'compliant': case 'passed': return 'success';
+      case 'partial': case 'warning': return 'warning';
+      case 'failed': case 'non_compliant': return 'error';
       default: return 'default';
     }
   };
 
   const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'critical': return 'error';
-      case 'high': return 'warning';
-      case 'medium': return 'info';
-      case 'low': return 'success';
-      default: return 'default';
-    }
+    switch (severity) { case 'critical': return 'error'; case 'high': return 'warning'; case 'medium': return 'info'; case 'low': return 'success'; default: return 'default'; }
   };
 
-  const getComplianceScoreColor = (score: number) => {
-    if (score >= 90) return 'success';
-    if (score >= 70) return 'warning';
-    return 'error';
-  };
+  const getScoreColor = (score: number) => score >= 90 ? 'success' : score >= 70 ? 'warning' : 'error';
 
-  const handleViewReport = (report: ComplianceReport) => {
-    setSelectedReport(report);
-    setDialogOpen(true);
-  };
-
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setSelectedReport(null);
-  };
+  const controlColumns = [
+    { id: 'control_id', label: 'Control ID', minWidth: 100 },
+    { id: 'title', label: 'Title', minWidth: 200 },
+    { id: 'framework', label: 'Framework', minWidth: 100, format: (val: string) => <Chip label={val} size="small" icon={<PolicyIcon />} /> },
+    { id: 'status', label: 'Status', minWidth: 100, format: (val: string) => <Chip label={val?.toUpperCase()} color={getStatusColor(val) as any} size="small" /> },
+    { id: 'severity', label: 'Severity', minWidth: 100, format: (val: string) => <Chip label={val?.toUpperCase()} color={getSeverityColor(val) as any} size="small" /> },
+    { id: 'last_tested', label: 'Last Tested', minWidth: 140, format: (val: string) => val ? new Date(val).toLocaleDateString() : '-' },
+  ];
 
   const handleCreateReport = async () => {
     try {
-      const response = await fetch(`${ENDPOINTS.compliance()}/reports`, {
+      const response = await fetch(`${ENDPOINTS.compliance()}reports/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...newReport,
-          id: `rpt_${Date.now()}`,
-          status: 'draft',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          generated_by: 'current_user',
-          compliance_score: 0,
-          total_controls: 0,
-          passed_controls: 0,
-          failed_controls: 0,
-          findings: []
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ framework: newReport.framework }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to create compliance report');
-      }
-
+      if (!response.ok) throw new Error('Failed to generate report');
+      toast.success('Report generation started');
       setCreateDialogOpen(false);
-      setNewReport({
-        name: '',
-        framework: '',
-        period_start: '',
-        period_end: '',
-        description: ''
-      });
-      fetchComplianceData();
+      setNewReport({ name: '', framework: '', period_start: '', period_end: '', description: '' });
+      fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create compliance report');
+      toast.error(err instanceof Error ? err.message : 'Failed to create report');
     }
   };
 
-  const handleDownloadReport = async (reportId: string) => {
-    try {
-      const response = await fetch(`${ENDPOINTS.compliance()}/reports/${reportId}/download`);
-      if (!response.ok) {
-        throw new Error('Failed to download report');
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `compliance-report-${reportId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to download report');
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  if (loading && reports.length === 0) {
-    return <LoadingSpinner />;
-  }
+  if (loading && reports.length === 0) return <LoadingSpinner />;
 
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Compliance Reports
-          </Typography>
+          <Typography variant="h4" component="h1" gutterBottom>Compliance Reports</Typography>
           <Typography variant="body1" color="text.secondary">
             Generate and manage compliance reports for various frameworks
           </Typography>
         </Box>
         <Stack direction="row" spacing={2}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={fetchComplianceData}
-            disabled={loading}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            Generate Report
-          </Button>
+          <Button variant="outlined" startIcon={<RefreshIcon />} onClick={fetchData} disabled={loading}>Refresh</Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateDialogOpen(true)}>Generate Report</Button>
         </Stack>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>{error}</Alert>}
 
-      {/* Statistics Cards */}
+      {/* Stats */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center">
-                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                  <AssessmentIcon />
-                </Avatar>
+                <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}><AssessmentIcon /></Avatar>
                 <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Total Reports
-                  </Typography>
-                  <Typography variant="h4">
-                    {reports.length}
-                  </Typography>
+                  <Typography color="textSecondary" gutterBottom>Total Reports</Typography>
+                  <Typography variant="h4">{reports.length}</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -312,16 +215,10 @@ const ComplianceReports: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center">
-                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
-                  <CheckCircleIcon />
-                </Avatar>
+                <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}><CheckCircleIcon /></Avatar>
                 <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Completed
-                  </Typography>
-                  <Typography variant="h4" color="success.main">
-                    {reports.filter(r => r.status === 'completed').length}
-                  </Typography>
+                  <Typography color="textSecondary" gutterBottom>Compliant</Typography>
+                  <Typography variant="h4" color="success.main">{reports.filter(r => r.status === 'compliant').length}</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -331,16 +228,10 @@ const ComplianceReports: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center">
-                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
-                  <ScheduleIcon />
-                </Avatar>
+                <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}><ScheduleIcon /></Avatar>
                 <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    In Progress
-                  </Typography>
-                  <Typography variant="h4" color="info.main">
-                    {reports.filter(r => r.status === 'in_progress').length}
-                  </Typography>
+                  <Typography color="textSecondary" gutterBottom>Controls Tracked</Typography>
+                  <Typography variant="h4" color="info.main">{totalControls}</Typography>
                 </Box>
               </Box>
             </CardContent>
@@ -350,17 +241,11 @@ const ComplianceReports: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center">
-                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                  <TrendingUpIcon />
-                </Avatar>
+                <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}><TrendingUpIcon /></Avatar>
                 <Box>
-                  <Typography color="textSecondary" gutterBottom>
-                    Avg. Score
-                  </Typography>
+                  <Typography color="textSecondary" gutterBottom>Avg. Score</Typography>
                   <Typography variant="h4" color="warning.main">
-                    {reports.length > 0 
-                      ? Math.round(reports.reduce((sum, r) => sum + r.compliance_score, 0) / reports.length)
-                      : 0}%
+                    {reports.length > 0 ? Math.round(reports.reduce((s, r) => s + r.score, 0) / reports.length) : 0}%
                   </Typography>
                 </Box>
               </Box>
@@ -369,31 +254,27 @@ const ComplianceReports: React.FC = () => {
         </Grid>
       </Grid>
 
-      {/* Compliance Frameworks */}
+      {/* Frameworks */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Available Compliance Frameworks
-        </Typography>
+        <Typography variant="h6" gutterBottom>Compliance Frameworks</Typography>
         <Grid container spacing={2}>
-          {frameworks.map((framework) => (
-            <Grid item xs={12} sm={6} md={4} key={framework.id}>
+          {frameworks.map((fw) => (
+            <Grid item xs={12} sm={6} md={4} key={fw.id}>
               <Card variant="outlined">
                 <CardContent>
-                  <Box display="flex" alignItems="center" mb={2}>
+                  <Box display="flex" alignItems="center" mb={1}>
                     <SecurityIcon color="primary" sx={{ mr: 1 }} />
-                    <Typography variant="subtitle1" fontWeight="medium">
-                      {framework.name}
-                    </Typography>
+                    <Typography variant="subtitle1" fontWeight="medium">{fw.name}</Typography>
+                    <Box flexGrow={1} />
+                    <Chip label={fw.status?.toUpperCase()} color={getStatusColor(fw.status) as any} size="small" />
                   </Box>
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    {framework.description}
-                  </Typography>
-                  <Typography variant="body2" gutterBottom>
-                    Version: {framework.version}
-                  </Typography>
-                  <Typography variant="body2">
-                    Controls: {framework.total_controls}
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>{fw.description}</Typography>
+                  {fw.enabled && (
+                    <Box display="flex" alignItems="center" mt={1}>
+                      <LinearProgress variant="determinate" value={fw.compliance_score} color={getScoreColor(fw.compliance_score) as any} sx={{ flex: 1, mr: 1 }} />
+                      <Typography variant="body2">{fw.compliance_score}%</Typography>
+                    </Box>
+                  )}
                 </CardContent>
               </Card>
             </Grid>
@@ -401,361 +282,72 @@ const ComplianceReports: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Typography variant="subtitle2">Filters:</Typography>
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Framework</InputLabel>
-            <Select
-              value={filterFramework}
-              label="Framework"
-              onChange={(e) => setFilterFramework(e.target.value)}
-            >
-              <MenuItem value="">All Frameworks</MenuItem>
-              {frameworks.map((framework) => (
-                <MenuItem key={framework.id} value={framework.id}>
-                  {framework.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filterStatus}
-              label="Status"
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <MenuItem value="">All Status</MenuItem>
-              <MenuItem value="draft">Draft</MenuItem>
-              <MenuItem value="in_progress">In Progress</MenuItem>
-              <MenuItem value="completed">Completed</MenuItem>
-              <MenuItem value="failed">Failed</MenuItem>
-            </Select>
-          </FormControl>
-          {loading && <CircularProgress size={20} />}
-        </Stack>
-      </Paper>
+      {/* Controls Table */}
+      <DataTable
+        title="Compliance Controls"
+        columns={controlColumns}
+        data={controls}
+        total={totalControls}
+        page={controlsPage}
+        pageSize={controlsPageSize}
+        loading={loading}
+        search={controlsSearch}
+        onSearchChange={setControlsSearch}
+        onPageChange={setControlsPage}
+        onPageSizeChange={setControlsPageSize}
+        getRowId={(row) => row.id}
+        searchPlaceholder="Search controls..."
+        emptyTitle="No controls found"
+        emptyMessage="No compliance controls match your search."
+      />
 
-      {/* Reports Table */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Report Name</TableCell>
-              <TableCell>Framework</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Compliance Score</TableCell>
-              <TableCell>Period</TableCell>
-              <TableCell>Generated</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {reports.map((report) => (
-              <TableRow key={report.id} hover>
-                <TableCell>
-                  <Box>
-                    <Typography variant="body2" fontWeight="medium">
-                      {report.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {report.id}
-                    </Typography>
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={report.framework}
-                    size="small"
-                    icon={<PolicyIcon />}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={report.status.replace('_', ' ').toUpperCase()}
-                    color={getStatusColor(report.status) as any}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Box display="flex" alignItems="center">
-                    <LinearProgress
-                      variant="determinate"
-                      value={report.compliance_score}
-                      color={getComplianceScoreColor(report.compliance_score) as any}
-                      sx={{ width: 80, mr: 1 }}
-                    />
-                    <Typography variant="body2">
-                      {report.compliance_score}%
-                    </Typography>
-                  </Box>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2">
-                    {formatDate(report.period_start)} - {formatDate(report.period_end)}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Typography variant="body2">
-                    {formatDate(report.created_at)}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    by {report.generated_by}
-                  </Typography>
-                </TableCell>
-                <TableCell>
-                  <Tooltip title="View Report">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleViewReport(report)}
-                    >
-                      <ViewIcon />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Download Report">
-                    <span>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDownloadReport(report.id)}
-                        disabled={report.status !== 'completed'}
-                      >
-                        <DownloadIcon />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      {/* Create Report Dialog */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>Generate New Compliance Report</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Report Name"
-                value={newReport.name}
-                onChange={(e) => setNewReport({ ...newReport, name: e.target.value })}
-                placeholder="e.g., Q4 2024 SOC 2 Compliance Report"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Compliance Framework</InputLabel>
-                <Select
-                  value={newReport.framework}
-                  label="Compliance Framework"
-                  onChange={(e) => setNewReport({ ...newReport, framework: e.target.value })}
-                >
-                  {frameworks.map((framework) => (
-                    <MenuItem key={framework.id} value={framework.id}>
-                      {framework.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Period Start"
-                type="date"
-                value={newReport.period_start}
-                onChange={(e) => setNewReport({ ...newReport, period_start: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Period End"
-                type="date"
-                value={newReport.period_end}
-                onChange={(e) => setNewReport({ ...newReport, period_end: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="Description"
-                value={newReport.description}
-                onChange={(e) => setNewReport({ ...newReport, description: e.target.value })}
-                placeholder="Optional description for this compliance report"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleCreateReport} 
-            variant="contained"
-            disabled={!newReport.name || !newReport.framework}
-          >
-            Generate Report
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Report Details Dialog */}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="lg" fullWidth>
+      {/* Report Detail Dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle>
           <Box display="flex" alignItems="center" justifyContent="space-between">
-            <Typography variant="h6">Compliance Report Details</Typography>
-            {selectedReport && (
-              <Chip
-                label={selectedReport.status.replace('_', ' ').toUpperCase()}
-                color={getStatusColor(selectedReport.status) as any}
-              />
-            )}
+            <Typography variant="h6">Compliance Report</Typography>
+            {selectedReport && <Chip label={selectedReport.status?.toUpperCase()} color={getStatusColor(selectedReport.status) as any} />}
           </Box>
         </DialogTitle>
         <DialogContent>
           {selectedReport && (
             <Box>
-              {/* Report Summary */}
               <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={6}>
                   <Paper sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Report Information
-                    </Typography>
                     <List dense>
-                      <ListItem>
-                        <ListItemIcon><AssignmentIcon /></ListItemIcon>
-                        <ListItemText 
-                          primary="Report Name" 
-                          secondary={selectedReport.name} 
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon><PolicyIcon /></ListItemIcon>
-                        <ListItemText 
-                          primary="Framework" 
-                          secondary={selectedReport.framework} 
-                        />
-                      </ListItem>
-                      <ListItem>
-                        <ListItemIcon><CalendarIcon /></ListItemIcon>
-                        <ListItemText 
-                          primary="Period" 
-                          secondary={`${formatDate(selectedReport.period_start)} - ${formatDate(selectedReport.period_end)}`} 
-                        />
-                      </ListItem>
+                      <ListItem><ListItemIcon><AssignmentIcon /></ListItemIcon><ListItemText primary="Framework" secondary={selectedReport.framework} /></ListItem>
+                      <ListItem><ListItemIcon><CalendarIcon /></ListItemIcon><ListItemText primary="Generated" secondary={new Date(selectedReport.generated_at).toLocaleDateString()} /></ListItem>
                     </List>
                   </Paper>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Compliance Metrics
-                    </Typography>
-                    <Box display="flex" alignItems="center" mb={2}>
-                      <Typography variant="h3" color={getComplianceScoreColor(selectedReport.compliance_score)}>
-                        {selectedReport.compliance_score}%
-                      </Typography>
-                      <Box ml={2}>
-                        <Typography variant="body2" color="text.secondary">
-                          Overall Compliance Score
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Grid container spacing={2}>
-                      <Grid item xs={4}>
-                        <Box textAlign="center">
-                          <Typography variant="h6" color="success.main">
-                            {selectedReport.passed_controls}
-                          </Typography>
-                          <Typography variant="caption">Passed</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Box textAlign="center">
-                          <Typography variant="h6" color="error.main">
-                            {selectedReport.failed_controls}
-                          </Typography>
-                          <Typography variant="caption">Failed</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <Box textAlign="center">
-                          <Typography variant="h6">
-                            {selectedReport.total_controls}
-                          </Typography>
-                          <Typography variant="caption">Total</Typography>
-                        </Box>
-                      </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, textAlign: 'center' }}>
+                    <Typography variant="h3" color={getScoreColor(selectedReport.score)}>{selectedReport.score}%</Typography>
+                    <Typography variant="body2" color="text.secondary">Compliance Score</Typography>
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={4}><Typography variant="h6" color="success.main">{selectedReport.controls_passed}</Typography><Typography variant="caption">Passed</Typography></Grid>
+                      <Grid item xs={4}><Typography variant="h6" color="error.main">{selectedReport.controls_failed}</Typography><Typography variant="caption">Failed</Typography></Grid>
+                      <Grid item xs={4}><Typography variant="h6">{selectedReport.controls_total}</Typography><Typography variant="caption">Total</Typography></Grid>
                     </Grid>
                   </Paper>
                 </Grid>
               </Grid>
-
-              <Divider sx={{ my: 3 }} />
-
-              {/* Findings */}
-              <Typography variant="h6" gutterBottom>
-                Compliance Findings
-              </Typography>
-              {selectedReport.findings.map((finding, index) => (
-                <Accordion key={finding.id} sx={{ mb: 1 }}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom>Findings</Typography>
+              {selectedReport.findings?.map((f: any, i: number) => (
+                <Accordion key={i} sx={{ mb: 1 }}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Box display="flex" alignItems="center" width="100%">
-                      <Box display="flex" alignItems="center" mr={2}>
-                        {finding.status === 'pass' ? (
-                          <CheckCircleIcon color="success" />
-                        ) : finding.status === 'fail' ? (
-                          <ErrorIcon color="error" />
-                        ) : (
-                          <InfoIcon color="info" />
-                        )}
-                      </Box>
-                      <Box flexGrow={1}>
-                        <Typography variant="subtitle2">
-                          {finding.control_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {finding.control_id}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={finding.severity.toUpperCase()}
-                        color={getSeverityColor(finding.severity) as any}
-                        size="small"
-                      />
+                    <Box display="flex" alignItems="center" gap={1} width="100%">
+                      {f.type === 'critical' ? <ErrorIcon color="error" /> : <WarningIcon color="warning" />}
+                      <Typography variant="subtitle2" sx={{ flex: 1 }}>{f.title}</Typography>
+                      <Chip label={f.severity?.toUpperCase()} color={getSeverityColor(f.severity) as any} size="small" />
                     </Box>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12}>
-                        <Typography variant="body2" gutterBottom>
-                          <strong>Description:</strong> {finding.description}
-                        </Typography>
-                      </Grid>
-                      {finding.evidence && (
-                        <Grid item xs={12}>
-                          <Typography variant="body2" gutterBottom>
-                            <strong>Evidence:</strong> {finding.evidence}
-                          </Typography>
-                        </Grid>
-                      )}
-                      {finding.remediation && (
-                        <Grid item xs={12}>
-                          <Typography variant="body2" gutterBottom>
-                            <strong>Remediation:</strong> {finding.remediation}
-                          </Typography>
-                        </Grid>
-                      )}
-                    </Grid>
+                    <Typography variant="body2" gutterBottom><strong>Control:</strong> {f.control}</Typography>
+                    <Typography variant="body2" gutterBottom><strong>Description:</strong> {f.description}</Typography>
+                    <Typography variant="body2"><strong>Remediation:</strong> {f.remediation}</Typography>
                   </AccordionDetails>
                 </Accordion>
               ))}
@@ -763,16 +355,29 @@ const ComplianceReports: React.FC = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Close</Button>
-          {selectedReport && selectedReport.status === 'completed' && (
-            <Button 
-              variant="contained" 
-              startIcon={<DownloadIcon />}
-              onClick={() => handleDownloadReport(selectedReport.id)}
-            >
-              Download Report
-            </Button>
-          )}
+          <Button onClick={() => setDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Report Dialog */}
+      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Generate New Compliance Report</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12}><TextField fullWidth label="Report Name" value={newReport.name} onChange={(e) => setNewReport({ ...newReport, name: e.target.value })} /></Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth>
+                <InputLabel>Framework</InputLabel>
+                <Select value={newReport.framework} label="Framework" onChange={(e) => setNewReport({ ...newReport, framework: e.target.value })}>
+                  {frameworks.map(f => <MenuItem key={f.id} value={f.id}>{f.name}</MenuItem>)}
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleCreateReport} variant="contained" disabled={!newReport.framework}>Generate</Button>
         </DialogActions>
       </Dialog>
     </Box>

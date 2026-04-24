@@ -15,10 +15,16 @@ from .response import router as response_router
 from .compliance import router as compliance_router
 from .threat_intel import router as threat_intel_router
 from .dashboard import router as dashboard_router
+from .export import router as export_router
+from .bulk import router as bulk_router
+from .siem import router as siem_router
+from .threat_hunting import router as hunting_router
+from .advanced_detection import router as advanced_detection_router
+from .soc_analyst import router as soc_analyst_router
 
 __all__ = [
     "detection_router",
-    "incidents_router", 
+    "incidents_router",
     "ml_router",
     "ai_router",
     "correlation_router",
@@ -26,5 +32,11 @@ __all__ = [
     "response_router",
     "compliance_router",
     "threat_intel_router",
-    "dashboard_router"
+    "dashboard_router",
+    "export_router",
+    "bulk_router",
+    "siem_router",
+    "hunting_router",
+    "advanced_detection_router",
+    "soc_analyst_router"
 ]

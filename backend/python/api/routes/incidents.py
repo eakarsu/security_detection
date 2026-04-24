@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import structlog
 from datetime import datetime
 from ..services.database import get_database_service
+from ..schemas.pagination import paginate
 
 logger = structlog.get_logger(__name__)
 
@@ -34,23 +35,56 @@ class Incident(BaseModel):
     event_type: Optional[str] = None
 
 
-@router.get("", response_model=List[Incident])
-@router.get("/", response_model=List[Incident])
+@router.get("")
+@router.get("/")
 async def get_incidents(
     status: Optional[str] = None,
     severity: Optional[str] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
     limit: int = 50
-) -> List[Incident]:
-    """Get security incidents from database"""
+) -> dict:
+    """Get security incidents from database with pagination and search"""
     try:
         # Get database service and connection
         db_service = await get_database_service()
         await db_service.ensure_connected()
         connection_context = await db_service.get_connection_context()
         async with connection_context as conn:
-            # Build query with filters
-            query = """
-                SELECT 
+            # Build base WHERE clause
+            where_clause = "WHERE 1=1"
+            params = []
+
+            if status:
+                params.append(status)
+                where_clause += " AND status = $" + str(len(params))
+
+            if severity:
+                params.append(severity)
+                where_clause += " AND severity = $" + str(len(params))
+
+            if search:
+                search_pattern = f"%{search}%"
+                p = len(params)
+                params.extend([search_pattern, search_pattern, search_pattern, search_pattern])
+                where_clause += (
+                    f" AND (description ILIKE ${p+1}"
+                    f" OR event_type ILIKE ${p+2}"
+                    f" OR user_id ILIKE ${p+3}"
+                    f" OR CAST(source_ip AS TEXT) ILIKE ${p+4})"
+                )
+
+            # Count query
+            count_query = f"SELECT COUNT(*) FROM security.events {where_clause}"
+            total = await conn.fetchval(count_query, *params)
+
+            # Data query with pagination
+            offset = (page - 1) * page_size
+            params.append(page_size)
+            params.append(offset)
+            data_query = f"""
+                SELECT
                     id,
                     event_type,
                     description,
@@ -65,23 +99,13 @@ async def get_incidents(
                     updated_at,
                     assigned_to
                 FROM security.events
-                WHERE 1=1
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT ${len(params) - 1} OFFSET ${len(params)}
             """
-            params = []
-            
-            if status:
-                query += " AND status = $" + str(len(params) + 1)
-                params.append(status)
-                
-            if severity:
-                query += " AND severity = $" + str(len(params) + 1)
-                params.append(severity)
-                
-            query += " ORDER BY created_at DESC LIMIT $" + str(len(params) + 1)
-            params.append(limit)
-            
-            rows = await conn.fetch(query, *params)
-        
+
+            rows = await conn.fetch(data_query, *params)
+
         incidents = []
         for row in rows:
             # Create title based on event type and description
@@ -90,7 +114,7 @@ async def get_incidents(
                 title += f" - User: {row['user_id']}"
             elif row['source_ip']:
                 title += f" - IP: {row['source_ip']}"
-                
+
             # Extract tags from event type and other fields
             tags = [row['event_type']]
             if row['source_ip']:
@@ -99,7 +123,7 @@ async def get_incidents(
                 tags.append("user_activity")
             if row['ml_score'] and row['ml_score'] > 0.8:
                 tags.append("high_confidence")
-                
+
             incident = Incident(
                 incident_id=str(row['id']),
                 title=title,
@@ -118,9 +142,14 @@ async def get_incidents(
                 event_type=row['event_type']
             )
             incidents.append(incident)
-            
-        return incidents
-        
+
+        return paginate(
+            items=[incident.dict() for incident in incidents],
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+
     except Exception as e:
         logger.error("Error retrieving incidents", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve incidents")

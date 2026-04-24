@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
+from ..schemas.pagination import paginate
 
 logger = structlog.get_logger(__name__)
 
@@ -76,13 +77,15 @@ async def analyze_security_event(
         raise HTTPException(status_code=500, detail="Analysis failed")
 
 
-@router.get("/events", response_model=List[SecurityEvent])
+@router.get("/events")
 async def get_recent_events(
     limit: int = 100,
-    severity: Optional[str] = None
-) -> List[SecurityEvent]:
+    severity: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20
+) -> dict:
     """
-    Get recent security events
+    Get recent security events with pagination
     """
     try:
         # Mock data - replace with actual database query
@@ -99,12 +102,22 @@ async def get_recent_events(
             )
             for i in range(1, min(limit + 1, 11))
         ]
-        
+
         if severity:
             events = [e for e in events if e.severity == severity]
-            
-        return events
-        
+
+        total = len(events)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_events = events[start:end]
+
+        return paginate(
+            items=[event.dict() for event in paginated_events],
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+
     except Exception as e:
         logger.error("Error retrieving events", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve events")

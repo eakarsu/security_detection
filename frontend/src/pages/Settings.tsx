@@ -42,8 +42,12 @@ import {
   Delete,
   Add,
   Save,
-  Refresh
+  Refresh,
+  Lock as LockIcon,
 } from '@mui/icons-material';
+import toast from 'react-hot-toast';
+import { ENDPOINTS } from '../config/api.ts';
+import { apiPut } from '../utils/apiClient.ts';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -111,6 +115,60 @@ const Settings: React.FC = () => {
       maxModelVersions: 5
     }
   });
+
+  // Change password state
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    new_password: '',
+    confirm_password: '',
+  });
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+
+  const handleChangePassword = async () => {
+    setPasswordError(null);
+
+    if (!passwordForm.current_password || !passwordForm.new_password || !passwordForm.confirm_password) {
+      setPasswordError('All fields are required');
+      return;
+    }
+    if (passwordForm.new_password.length < 8) {
+      setPasswordError('New password must be at least 8 characters');
+      return;
+    }
+    if (!/[A-Z]/.test(passwordForm.new_password)) {
+      setPasswordError('New password must contain an uppercase letter');
+      return;
+    }
+    if (!/[a-z]/.test(passwordForm.new_password)) {
+      setPasswordError('New password must contain a lowercase letter');
+      return;
+    }
+    if (!/[0-9]/.test(passwordForm.new_password)) {
+      setPasswordError('New password must contain a number');
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    try {
+      setPasswordSaving(true);
+      await apiPut(ENDPOINTS.authChangePassword(), {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+      toast.success('Password changed successfully');
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to change password';
+      setPasswordError(msg);
+      toast.error(msg);
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
 
   const [apiKeys] = useState([
     { id: 1, name: 'OpenRouter API', service: 'OpenRouter', status: 'active', lastUsed: '2025-08-02' },
@@ -269,6 +327,62 @@ const Settings: React.FC = () => {
                     }
                     label="Enable Audit Logging"
                   />
+                </CardContent>
+              </Card>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Card>
+                <CardHeader
+                  title="Change Password"
+                  avatar={<LockIcon color="primary" />}
+                />
+                <CardContent>
+                  {passwordError && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPasswordError(null)}>
+                      {passwordError}
+                    </Alert>
+                  )}
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        type="password"
+                        label="Current Password"
+                        value={passwordForm.current_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        type="password"
+                        label="New Password"
+                        value={passwordForm.new_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                        helperText="Min 8 chars, uppercase, lowercase, number"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField
+                        fullWidth
+                        type="password"
+                        label="Confirm New Password"
+                        value={passwordForm.confirm_password}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Button
+                        variant="contained"
+                        startIcon={<LockIcon />}
+                        onClick={handleChangePassword}
+                        disabled={passwordSaving}
+                      >
+                        {passwordSaving ? 'Changing...' : 'Change Password'}
+                      </Button>
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             </Grid>

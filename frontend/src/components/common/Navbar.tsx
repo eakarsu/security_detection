@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -18,8 +19,12 @@ import {
   Logout as LogoutIcon,
   Settings as SettingsIcon,
 } from '@mui/icons-material';
+import toast from 'react-hot-toast';
+import { useAuth } from '../../hooks/useAuth.tsx';
 
 const Navbar: React.FC = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -30,6 +35,26 @@ const Navbar: React.FC = () => {
     setAnchorEl(null);
   };
 
+  const handleLogout = async () => {
+    handleClose();
+    await logout();
+    toast.success('Logged out successfully');
+    navigate('/login');
+  };
+
+  const handleSettings = () => {
+    handleClose();
+    navigate('/settings');
+  };
+
+  const initials = user
+    ? `${(user.first_name || '')[0] || ''}${(user.last_name || '')[0] || ''}`.toUpperCase() || 'U'
+    : 'U';
+
+  const displayName = user
+    ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+    : 'User';
+
   return (
     <AppBar position="static" sx={{ zIndex: 1201 }}>
       <Toolbar>
@@ -39,6 +64,9 @@ const Navbar: React.FC = () => {
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}>
+            {displayName}
+          </Typography>
           <IconButton color="inherit">
             <Badge badgeContent={3} color="error">
               <NotificationsIcon />
@@ -54,7 +82,7 @@ const Navbar: React.FC = () => {
             color="inherit"
           >
             <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
-              SA
+              {initials}
             </Avatar>
           </IconButton>
 
@@ -73,16 +101,22 @@ const Navbar: React.FC = () => {
             open={Boolean(anchorEl)}
             onClose={handleClose}
           >
+            <MenuItem disabled>
+              <Typography variant="body2" color="text.secondary">
+                {user?.email}
+              </Typography>
+            </MenuItem>
+            <Divider />
             <MenuItem onClick={handleClose}>
               <AccountIcon sx={{ mr: 1 }} />
               Profile
             </MenuItem>
-            <MenuItem onClick={handleClose}>
+            <MenuItem onClick={handleSettings}>
               <SettingsIcon sx={{ mr: 1 }} />
               Settings
             </MenuItem>
             <Divider />
-            <MenuItem onClick={handleClose}>
+            <MenuItem onClick={handleLogout}>
               <LogoutIcon sx={{ mr: 1 }} />
               Logout
             </MenuItem>

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 import structlog
 from datetime import datetime, timedelta
 from ..services.database import DatabaseService
+from ..schemas.pagination import paginate
 
 logger = structlog.get_logger(__name__)
 
@@ -219,16 +220,26 @@ async def get_top_threats(limit: int = 10) -> List[TopThreat]:
 
 
 @router.get("/recent-events")
-async def get_recent_events(limit: int = 10) -> List[Dict[str, Any]]:
-    """Get recent security events for dashboard"""
+async def get_recent_events(
+    limit: int = 10,
+    page: int = 1,
+    page_size: int = 20
+) -> dict:
+    """Get recent security events for dashboard with pagination"""
     try:
         # Create database service instance
         db = DatabaseService()
         await db.initialize()
         conn = await db.get_connection()
-        
+
+        # Count total events
+        count_query = "SELECT COUNT(*) FROM security.events"
+        total = await conn.fetchval(count_query)
+
+        # Get paginated events
+        offset = (page - 1) * page_size
         query = """
-            SELECT 
+            SELECT
                 id,
                 event_type,
                 severity,
@@ -238,14 +249,14 @@ async def get_recent_events(limit: int = 10) -> List[Dict[str, Any]]:
                 status,
                 created_at,
                 ml_score
-            FROM security.events 
+            FROM security.events
             ORDER BY created_at DESC
-            LIMIT $1
+            LIMIT $1 OFFSET $2
         """
-        
-        rows = await conn.fetch(query, limit)
+
+        rows = await conn.fetch(query, page_size, offset)
         await conn.close()
-        
+
         events = []
         for row in rows:
             event = {
@@ -260,9 +271,14 @@ async def get_recent_events(limit: int = 10) -> List[Dict[str, Any]]:
                 "ml_score": float(row['ml_score']) if row['ml_score'] else None
             }
             events.append(event)
-        
-        return events
-        
+
+        return paginate(
+            items=events,
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+
     except Exception as e:
         logger.error("Error retrieving recent events", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve recent events")

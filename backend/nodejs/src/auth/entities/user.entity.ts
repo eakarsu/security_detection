@@ -120,7 +120,7 @@ export class User {
   updated_at: Date;
 
   // Relations
-  @Column('uuid')
+  @Column('uuid', { nullable: true })
   tenant_id: string;
 
   @ManyToOne(() => Tenant, tenant => tenant.users)

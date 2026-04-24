@@ -1,0 +1,142 @@
+Erol Akarsu  
+Richmond, VA | eakarsu@gmail.com  
+LinkedIn: https://www.linkedin.com/in/erol-akarsu/ | GitHub: https://github.com/eakarsu
+
+Innovative AI Solutions Developer & Entrepreneur
+
+Results-driven technology entrepreneur and senior machine learning architect with 20+ years of enterprise experience. Currently leading cutting-edge ML initiatives at Lowe's while simultaneously building 10 comprehensive AI-powered platforms across legal, hospitality, financial, trading, government contracting, cybersecurity, and business management sectors. Expert in democratizing AI technology for SMBs through accessible, secure, and scalable solutions.
+
+Entrepreneurial AI Platform Portfolio
+Founder & Lead Developer | 10 AI-Powered Platforms | Ongoing
+
+Successfully launched a comprehensive ecosystem of AI-powered business platforms demonstrating exceptional entrepreneurial vision and technical execution across multiple industries.
+
+ Legal Technology & Document Processing
+- https://legalaiforms.com - AI-powered legal document generation covering business formation, real estate, family law, and estate planning with secure authentication and multi-format downloads
+- https://norshin.com (PDFGenius) - Advanced PDF data extraction achieving 99% accuracy using proprietary Vision AI for enterprise document processing. Richmond, VA headquarters with professional support infrastructure
+
+ Food Service & Hospitality
+- https://orderlybite.com - Revolutionary multi-channel ordering platform featuring SMS, phone ordering, and voice call integration with AI-powered menu optimization
+- https://elitepos.chat - Comprehensive restaurant POS solution with inventory management, KOT systems, multi-location support, and real-time analytics
+
+ Government Contracting & Financial Intelligence
+- https://contracts.orderlybite.com - Government contract management platform with AI-powered contract analysis and automated RFP/RFI generation targeting specialized B2G market
+- https://cashflowapp.app - Financial management application providing real-time cash flow forecasting, predictive algorithms, and business intelligence with mobile-first design
+
+ Cybersecurity & Security Intelligence
+- https://security.orderlybite.com - Comprehensive AI-powered cybersecurity platform featuring incident management, threat intelligence, and compliance monitoring with SOAR integration, visual workflow builder, and MITRE ATT&CK Framework. Supports GDPR, ISO 27001, NIST, PCI DSS, HIPAA, and SOX compliance with microservices architecture
+
+ Financial Trading & Investment
+- https://stockstrategy.info - AI Trading Platform with portfolio management tracking $150,000+ assets, multi-timeframe performance analytics, and real-time market analysis with professional trading interface
+
+ Business Process Automation & AI Services
+- https://omniassistai.com - Virtual assistant services platform for startups and SMBs providing admin, marketing, and web task automation
+- https://serviqai.com - AI-powered service solutions platform with versatile architecture adaptable to diverse industry requirements
+
+Technical Architecture Excellence
+
+Core Innovation Framework:
+- AI Integration: Vision AI, contract analysis, menu optimization, predictive analytics, trading algorithms, cybersecurity threat detection, and workflow automation
+- Multi-Channel Systems: SMS, voice call, web interfaces with secure authentication and user management across all platforms
+- Scalable Infrastructure: Cloud-based architecture supporting multi-location, high-volume processing with real-time analytics dashboards
+- Enterprise Security: SOAR platforms, MITRE ATT&CK integration, multi-framework compliance automation
+
+Market Strategy:
+- Industry Diversification: Legal, hospitality, government, financial, trading, cybersecurity, and business automation sectors
+- SMB Focus: Making enterprise-grade AI accessible to smaller businesses with professional operations and Richmond, VA presence
+- Technology Leadership: Integrating emerging AI capabilities into practical business solutions with GitHub portfolio demonstrating full-stack expertise
+
+Key Achievements Summary
+
+- 10 AI-powered platforms built and deployed with professional operations and active user bases
+- Enterprise cybersecurity platform with automated security workflows, SOAR integration, and multi-framework compliance monitoring
+- 99% accuracy achieved in PDF data extraction using proprietary Vision AI algorithms
+- $150,000+ portfolio management through comprehensive AI trading platform
+- 20+ years enterprise experience with Fortune 500 companies (Lowe's, Capital One, Cisco)
+- PhD in Computer Science with pioneering work in distributed computing portals
+
+Core Technical Competencies
+
+AI & Machine Learning: ML Transformer Models, Vision AI, Generative AI, Neural Networks, Deep Learning, Document Processing, Predictive Analytics, Cybersecurity AI, Security Orchestration
+
+Programming & Development: Java, JavaScript, Python, Scala, Spring/Spring Boot, Angular, NodeJS, Apache Beam
+
+Big Data & Cloud: Apache Spark, Hadoop, Solr, Elasticsearch, Google Cloud, Terraform, MongoDB, PostgreSQL
+
+Enterprise Systems: Microservices, API Development, DevOps, CI/CD, Authentication, SSL, SIEM integration
+
+Industry Expertise: E-commerce, Financial Trading, Government Contracting, Cybersecurity, Legal Technology, Blockchain
+
+Education & Certifications
+
+PhD, IDE for Grid Computing | Syracuse University | 1994-1999 | GPA: 3.8  
+MS, Computer Science | Syracuse University | 1994-1996 | GPA: 3.7  
+MS, Computer Engineering | Istanbul Technical University | 1991-1993 | GPA: 3.5  
+BS, Computer Engineering | Ege University | 1986-1991 | GPA: 3.0
+
+Recent ML Certifications: Neural Networks and Deep Learning, Advanced Learning Algorithms, Unsupervised Learning (Coursera, 2022)
+
+Professional Experience
+
+Lead Machine Learning Architect  
+Lowe's Companies, Inc. | Charlotte, NC (Remote) | Jan 2024 - Present
+-  Developing advanced system to curate and select optimal images from vast databases using state-of-the-art ML transformer models for enhanced product displays and user engagement
+-  Leading Project Quota Assistance system powered by Generative AI to provide immediate, accurate answers for resource allocation optimization and project management efficiency
+-  Architecting enterprise-scale ML solutions that directly impact customer experience and operational efficiency
+
+Principal Software Engineer  
+Lowe's Companies, Inc. | Mooresville, NC | Oct 2020 - Present
+-  Design and build critical features for Lowe's.com including workflow applications for Apache Beam data pipelines and Elastic Search frameworks
+-  Engineered pivotal e-commerce features including free delivery, expedited delivery, and promotions through end-to-end software lifecycle management and Spark application development
+-  Reduced client costs significantly while elevating feature quality through automated build processes optimizing long-term maintenance
+-  Spearheaded project roadmaps serving as single-threaded leader between senior VPs and engineering teams, prioritizing end-user impact while maintaining regulatory compliance
+-  Enhanced cloud-based search experience with near-real-time indexing and product ingestion processes using Couch Base and Solr
+
+Senior Software Architect  
+Wipro Limited | Richmond, VA | May 2018 - Oct 2020
+-  Architected products on Solr for blockchain and cryptocurrency customers, creating groundbreaking features including profit sharing with nominal interest fees and security schemas for borrowed tokens
+-  Reduced product indexing time by 9x (from 360 to 40 minutes for 5 million products) through ETL process optimization using Scala, Spark, Couchbase, and Solr
+-  Constructed Lowe's enterprise search infrastructure on Google Cloud using Terraform, Packer, Ansible, and Jenkins for automated deployment
+-  Developed expertise in blockchain technologies including NextJS Web Frontend, Web3, Remix, and Solidity
+
+Master Software Engineer  
+Capital One | Richmond, VA | Aug 2016 - Dec 2017
+-  Led design of data flows and sandbox environments for API development and service virtualization frameworks
+-  Overhauled developer.capitalone.com website leading team efforts using Protractor, Cucumber, Spring Framework, NodeJS, JavaScript, Express, and AngularJS
+-  Produced fully automated API testing without user input via MVC, Swagger, FSM, and Graph Computing
+-  Enhanced multiple web features presented in company-wide meetings
+
+Senior Software Developer  
+pExchange | Richmond, VA | Dec 2017 - Mar 2018
+-  Designed user management system for presidential budget preparation using Spring Boot, MongoDB, Angular, and Apache Shiro for user roles and permissions
+-  Augmented team productivity by assessing and implementing standard software toolsets
+
+Software Engineer  
+Cisco Systems | Richmond, VA | Nov 1999 - Jul 2007
+-  Worked on unified communications software contributing to enterprise communication solutions
+
+Senior Software Analyst/Technical Lead  
+Ferguson Enterprises | Jul 2007 - Jul 2016
+-  Led multiple web development projects for enterprise-level solutions
+
+Independent Software Consultant  
+Self Employed | Sep 2003 - Aug 2017 (14 years)
+-  Built complete Turkish search engine for food retail chain using big data pipelines, Apache Nutch/SOLR/Hadoop/Node.js/Bootstrap with 15 ranking criteria
+-  Achieved 99.5% extraction success rate implementing rule extraction in XQUERY for 700K lines of COBOL code (237 files)
+-  Renovated government websites using Angular and NodeJS, leading entire software development lifecycle
+-  Developed SOA Router/Proxy using .NET technologies for secure intra-company web services
+-  Created Oracle WCI API for Navy portal systems with automated portal execution
+
+Complete Platform Portfolio Summary
+10 Comprehensive AI-Powered Platforms:
+
+1. https://legalaiforms.com - AI legal document generation (secure access)
+2. https://norshin.com - Advanced PDF processing with 99% accuracy
+3. https://orderlybite.com - Multi-channel food ordering with SMS/phone
+4. https://contracts.orderlybite.com - Government contract management
+5. https://elitepos.chat - Restaurant POS solution (secure access)
+6. https://cashflowapp.app - Financial management and forecasting
+7. https://omniassistai.com - Virtual assistant services
+8. https://serviqai.com - AI-powered service solutions
+9. https://stockstrategy.info - AI trading platform with portfolio management (secure access)
+10. https://security.orderlybite.com - AI-powered cybersecurity platform with SOAR integration

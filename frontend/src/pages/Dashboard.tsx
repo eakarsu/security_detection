@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -16,6 +17,8 @@ import {
 } from '@mui/icons-material';
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+
   const stats = [
     {
       title: 'Active Threats',
@@ -23,6 +26,7 @@ const Dashboard: React.FC = () => {
       icon: <SecurityIcon />,
       color: '#f44336',
       change: '+3 from yesterday',
+      onClick: () => navigate('/incidents?severity=critical&status=open'),
     },
     {
       title: 'Incidents Resolved',
@@ -30,6 +34,7 @@ const Dashboard: React.FC = () => {
       icon: <CheckCircleIcon />,
       color: '#4caf50',
       change: '+15 from yesterday',
+      onClick: () => navigate('/incidents?status=resolved'),
     },
     {
       title: 'Alerts Generated',
@@ -37,6 +42,7 @@ const Dashboard: React.FC = () => {
       icon: <WarningIcon />,
       color: '#ff9800',
       change: '+89 from yesterday',
+      onClick: () => navigate('/incidents'),
     },
     {
       title: 'System Health',
@@ -44,6 +50,7 @@ const Dashboard: React.FC = () => {
       icon: <TrendingUpIcon />,
       color: '#2196f3',
       change: '+0.2% from yesterday',
+      onClick: () => navigate('/settings'),
     },
   ];
 
@@ -59,7 +66,17 @@ const Dashboard: React.FC = () => {
       <Grid container spacing={3}>
         {stats.map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
-            <Card>
+            <Card
+              onClick={stat.onClick}
+              sx={{
+                cursor: 'pointer',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: `0 8px 25px rgba(0, 0, 0, 0.3)`,
+                },
+              }}
+            >
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Box

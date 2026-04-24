@@ -54,6 +54,12 @@ python-multipart>=0.0.6
 # File handling
 aiofiles>=23.2.0
 
+# PDF export
+reportlab>=4.0.0
+
+# YAML parsing (Sigma rules)
+pyyaml>=6.0.1
+
 # Development and testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
