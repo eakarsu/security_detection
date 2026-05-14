@@ -4,7 +4,7 @@ Interactive AI-powered SOC analyst for alert triage, incident investigation,
 threat correlation, and security operations assistance.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 import structlog
@@ -15,6 +15,7 @@ from ..services.soc_analyst_service import (
     SOCAnalystResponse,
     SOCAction,
 )
+from ..middleware.ai_rate_limit import ai_rate_limiter
 
 logger = structlog.get_logger(__name__)
 
@@ -45,7 +46,7 @@ class BulkTriageRequest(BaseModel):
     session_id: Optional[str] = None
 
 
-@router.post("/chat", response_model=SOCAnalystResponse)
+@router.post("/chat", response_model=SOCAnalystResponse, dependencies=[Depends(ai_rate_limiter())])
 async def soc_analyst_chat(request: ChatRequest) -> SOCAnalystResponse:
     """
     Main chat endpoint for the AI SOC Analyst.
@@ -75,7 +76,7 @@ async def soc_analyst_chat(request: ChatRequest) -> SOCAnalystResponse:
         raise HTTPException(status_code=500, detail=f"SOC Analyst error: {str(e)}")
 
 
-@router.post("/triage", response_model=SOCAnalystResponse)
+@router.post("/triage", response_model=SOCAnalystResponse, dependencies=[Depends(ai_rate_limiter())])
 async def quick_triage(request: QuickTriageRequest) -> SOCAnalystResponse:
     """
     Quick triage endpoint for a single security alert.

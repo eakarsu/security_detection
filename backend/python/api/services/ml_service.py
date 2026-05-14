@@ -233,45 +233,62 @@ class FeatureExtractor:
 
 class MLService:
     """Hybrid ML service combining classical ML with AI analysis"""
-    
+
     def __init__(self):
         self.feature_extractor = FeatureExtractor()
         self.models = {}
         self.model_metrics = {}
         self.is_initialized = False
         self.openrouter_service: Optional[OpenRouterService] = None
-        
+        self._rule_based_fallback_active = False
+
+        # Rule-based engine used when model files are absent
+        from api.services.rule_based_engine import RuleBasedEngine
+        self._rule_engine = RuleBasedEngine()
+
         # Model paths
         self.model_path = Path(settings.ML_MODEL_PATH)
         self.model_path.mkdir(exist_ok=True)
-        
+
         # Performance tracking
         self.prediction_count = 0
         self.ai_analysis_count = 0
         self.false_positive_count = 0
         
     async def initialize(self):
-        """Initialize the ML service"""
+        """Initialize the ML service. Sets is_initialized=True even if only rule-based fallback is available."""
         try:
             logger.info("Initializing ML service")
-            
+
             # Initialize OpenRouter service for AI analysis
-            self.openrouter_service = OpenRouterService()
-            await self.openrouter_service.initialize()
-            
-            # Load or train models
+            try:
+                self.openrouter_service = OpenRouterService()
+                await self.openrouter_service.initialize()
+            except Exception as oe:
+                logger.warning("OpenRouter service unavailable during ML init", error=str(oe))
+
+            # Load or train models (may activate rule-based fallback internally)
             await self._load_or_train_models()
-            
+
             self.is_initialized = True
-            logger.info("ML service initialized successfully")
-            
+            if self._rule_based_fallback_active:
+                logger.warning(
+                    "ML service initialized in RULE-BASED FALLBACK mode — "
+                    "no trained model artifacts found. Predictions use heuristic rules."
+                )
+            else:
+                logger.info("ML service initialized successfully")
+
         except Exception as e:
             logger.error("Failed to initialize ML service", error=str(e))
-            raise
+            # Still mark initialized so the app can start, but in fallback mode
+            self._rule_based_fallback_active = True
+            self.is_initialized = True
+            logger.warning("ML service running in rule-based fallback mode due to initialization error")
     
     def is_ready(self) -> bool:
-        """Check if service is ready"""
-        return self.is_initialized and len(self.models) > 0
+        """Check if service is ready (ML ensemble or rule-based fallback)"""
+        return self.is_initialized and (len(self.models) > 0 or self._rule_based_fallback_active)
     
     async def health_check(self) -> bool:
         """Health check for the service"""
@@ -296,11 +313,27 @@ class MLService:
     async def predict_threat(self, event: SecurityEvent) -> MLPrediction:
         """Predict threat level for a security event"""
         start_time = time.time()
-        
+
+        # --- Graceful degradation: use rule-based engine when ML models are absent ---
+        if self._rule_based_fallback_active or not self.models:
+            logger.warning(
+                "ML models unavailable — using rule-based fallback",
+                event_id=event.event_id,
+            )
+            rb = self._rule_engine.evaluate(event.raw_data)
+            return MLPrediction(
+                event_id=event.event_id,
+                threat_score=rb["threat_score"],
+                confidence=rb["confidence"],
+                model_name="rule_based",
+                features=rb.get("matched_rules", []),
+                prediction_time=datetime.now(timezone.utc),
+            )
+
         try:
             # Extract features
             features = self.feature_extractor.extract_features(event)
-            
+
             # Get predictions from all models
             predictions = {}
             for model_name, model in self.models.items():
@@ -309,7 +342,7 @@ class MLService:
                     predictions[model_name] = pred_score
                 except Exception as e:
                     logger.warning(f"Prediction failed for model {model_name}", error=str(e))
-            
+
             if not predictions:
                 raise Exception("No models available for prediction")
             
@@ -533,20 +566,40 @@ class MLService:
         }
     
     async def _load_or_train_models(self):
-        """Load existing models or train new ones"""
+        """Load existing models or train new ones. Falls back to rule-based engine if both fail."""
         try:
             # Try to load existing models
             if await self._load_models():
                 logger.info("Loaded existing ML models")
                 return
-            
+
+            # Check if model files actually exist before trying to train
+            model_files = {
+                "xgboost": self.model_path / "xgboost_model.pkl",
+                "random_forest": self.model_path / "random_forest_model.pkl",
+                "isolation_forest": self.model_path / "isolation_forest_model.pkl",
+            }
+            any_exist = any(f.exists() for f in model_files.values())
+
+            if not any_exist:
+                logger.warning(
+                    "No pre-trained model artifacts found. "
+                    "Training new models from synthetic data. "
+                    "Predictions will use rule-based fallback until training completes."
+                )
+
             # If no models exist, train new ones
             logger.info("No existing models found, training new models")
             await self._train_models()
-            
+
         except Exception as e:
-            logger.error("Failed to load or train models", error=str(e))
-            raise
+            logger.warning(
+                "Failed to load or train ML models — switching to rule-based fallback",
+                error=str(e),
+            )
+            # Activate rule-based mode: models dict stays empty, predict_threat
+            # will use the RuleBasedEngine instead of crashing.
+            self._rule_based_fallback_active = True
     
     async def _load_models(self) -> bool:
         """Load models from disk"""

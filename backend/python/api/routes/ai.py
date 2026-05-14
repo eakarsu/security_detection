@@ -7,8 +7,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
-from datetime import datetime
+from datetime import datetime, timezone
 from ..services.openrouter_service import OpenRouterService, ThreatAnalysisRequest
+from ..middleware.ai_rate_limit import ai_rate_limiter
 
 logger = structlog.get_logger(__name__)
 
@@ -35,7 +36,7 @@ class AIAnalysisResponse(BaseModel):
     context_included: bool
 
 
-@router.post("/analyze", response_model=AIAnalysisResponse)
+@router.post("/analyze", response_model=AIAnalysisResponse, dependencies=[Depends(ai_rate_limiter())])
 async def analyze_threat(request: AIAnalysisRequest) -> AIAnalysisResponse:
     """Real AI analysis for security events"""
     try:
@@ -70,6 +71,15 @@ async def analyze_threat(request: AIAnalysisRequest) -> AIAnalysisResponse:
                    model=request.model,
                    processing_time=processing_time)
         
+        # Persist MITRE mappings returned by the AI to the database
+        if hasattr(ai_result, "mitre_mappings") and ai_result.mitre_mappings:
+            detection_id = request.event_data.get("detection_id") or request.event_data.get("event_id")
+            await _persist_mitre_mappings(
+                detection_id=detection_id,
+                mitre_mappings=ai_result.mitre_mappings,
+                confidence=analysis_result["confidence"],
+            )
+
         return AIAnalysisResponse(
             analysis=analysis_result["analysis"],
             recommendations=analysis_result["recommendations"],
@@ -80,10 +90,10 @@ async def analyze_threat(request: AIAnalysisRequest) -> AIAnalysisResponse:
             model_used=request.model,
             context_included=request.include_context
         )
-        
+
     except Exception as e:
         logger.error("AI analysis failed", error=str(e))
-        
+
         # Fallback analysis if AI service fails
         fallback_result = generate_fallback_analysis(request.event_data)
         processing_time = (datetime.utcnow() - start_time).total_seconds()
@@ -490,3 +500,88 @@ def determine_threat_level_from_risk_score(risk_score: float) -> str:
         return "medium"
     else:
         return "low"
+
+
+async def _persist_mitre_mappings(
+    detection_id: Optional[str],
+    mitre_mappings: List[Dict[str, str]],
+    confidence: float,
+) -> None:
+    """
+    Persist MITRE ATT&CK mappings returned by the AI to security.mitre_mappings.
+
+    Schema (from siem_threat_hunting_schema.sql):
+        id, detection_type, detection_rule_id, tactic_id, tactic_name,
+        technique_id, technique_name, sub_technique_id, sub_technique_name,
+        confidence, notes, created_at
+    We store detection_id in the notes field as a foreign reference since the
+    existing table has no dedicated detection_id column.
+    """
+    if not mitre_mappings:
+        return
+
+    try:
+        from ..services.database import get_database_service
+        db = await get_database_service()
+        await db.ensure_connected()
+
+        now = datetime.now(timezone.utc)
+
+        # Map confidence float (0-1) to the CHECK constraint values
+        if confidence >= 0.75:
+            confidence_label = "high"
+        elif confidence >= 0.4:
+            confidence_label = "medium"
+        else:
+            confidence_label = "low"
+
+        async with db._pool.acquire() as conn:
+            for mapping in mitre_mappings:
+                tactic_id = mapping.get("tactic_id", "")
+                tactic_name = mapping.get("tactic", "") or mapping.get("tactic_name", "")
+                technique_id = mapping.get("technique_id", "")
+                technique_name = mapping.get("technique_name", "")
+                sub_technique_id = mapping.get("sub_technique_id")
+                sub_technique_name = mapping.get("sub_technique_name")
+
+                if not (tactic_id and technique_id):
+                    continue
+
+                notes = f"detection_id:{detection_id}" if detection_id else None
+
+                await conn.execute(
+                    """
+                    INSERT INTO security.mitre_mappings (
+                        detection_type, detection_event_id,
+                        tactic_id, tactic_name,
+                        technique_id, technique_name,
+                        sub_technique_id, sub_technique_name,
+                        confidence, notes, created_at
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    """,
+                    "ai_analysis",
+                    detection_id,  # detection_event_id
+                    tactic_id,
+                    tactic_name,
+                    technique_id,
+                    technique_name,
+                    sub_technique_id,
+                    sub_technique_name,
+                    confidence_label,
+                    notes,
+                    now,
+                )
+
+        logger.info(
+            "Persisted MITRE mappings",
+            detection_id=detection_id,
+            count=len(mitre_mappings),
+        )
+
+    except Exception as e:
+        # Do not let persistence failure block the API response
+        logger.warning(
+            "Failed to persist MITRE mappings — DB may not be connected",
+            error=str(e),
+            detection_id=detection_id,
+        )

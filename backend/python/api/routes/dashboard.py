@@ -7,8 +7,8 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import structlog
-from datetime import datetime, timedelta
-from ..services.database import DatabaseService
+from datetime import datetime, timedelta, timezone
+from ..services.database import DatabaseService, get_database_service
 from ..schemas.pagination import paginate
 
 logger = structlog.get_logger(__name__)
@@ -341,3 +341,143 @@ async def get_system_health() -> Dict[str, Any]:
     except Exception as e:
         logger.error("Error retrieving system health", error=str(e))
         raise HTTPException(status_code=500, detail="Failed to retrieve system health")
+
+
+@router.get("/stats")
+async def get_dashboard_stats() -> Dict[str, Any]:
+    """
+    Aggregated detection statistics from real DB records.
+
+    Returns:
+      - total_detections: counts for today / this week / this month
+      - severity_breakdown: critical / high / medium / low counts (all-time scope = month)
+      - top_attack_techniques: top 10 event_types by occurrence this month
+      - detection_trend: hourly detection counts for the last 24 hours
+    """
+    try:
+        db = await get_database_service()
+        await db.ensure_connected()
+
+        now = datetime.now(timezone.utc)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start = today_start - timedelta(days=now.weekday())
+        month_start = today_start.replace(day=1)
+        day_ago = now - timedelta(hours=24)
+
+        async with db._pool.acquire() as conn:
+
+            # --- Total detections ---
+            total_today = await conn.fetchval(
+                "SELECT COUNT(*) FROM security.events WHERE created_at >= $1",
+                today_start,
+            )
+            total_week = await conn.fetchval(
+                "SELECT COUNT(*) FROM security.events WHERE created_at >= $1",
+                week_start,
+            )
+            total_month = await conn.fetchval(
+                "SELECT COUNT(*) FROM security.events WHERE created_at >= $1",
+                month_start,
+            )
+
+            # --- Severity breakdown (last 30 days) ---
+            sev_rows = await conn.fetch(
+                """
+                SELECT severity, COUNT(*) AS cnt
+                FROM security.events
+                WHERE created_at >= $1
+                GROUP BY severity
+                """,
+                month_start,
+            )
+            severity_breakdown = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+            for row in sev_rows:
+                sev = (row["severity"] or "low").lower()
+                if sev in severity_breakdown:
+                    severity_breakdown[sev] = int(row["cnt"])
+
+            # --- Top attack techniques (last 30 days) ---
+            technique_rows = await conn.fetch(
+                """
+                SELECT event_type, COUNT(*) AS cnt
+                FROM security.events
+                WHERE created_at >= $1 AND event_type IS NOT NULL
+                GROUP BY event_type
+                ORDER BY cnt DESC
+                LIMIT 10
+                """,
+                month_start,
+            )
+            top_techniques = [
+                {
+                    "technique": row["event_type"].replace("_", " ").title(),
+                    "count": int(row["cnt"]),
+                }
+                for row in technique_rows
+            ]
+
+            # --- MITRE technique breakdown from mitre_mappings (bonus) ---
+            mitre_rows = await conn.fetch(
+                """
+                SELECT technique_id, technique_name, COUNT(*) AS cnt
+                FROM security.mitre_mappings
+                WHERE created_at >= $1
+                GROUP BY technique_id, technique_name
+                ORDER BY cnt DESC
+                LIMIT 10
+                """,
+                month_start,
+            )
+            top_mitre_techniques = [
+                {
+                    "technique_id": row["technique_id"],
+                    "technique_name": row["technique_name"],
+                    "count": int(row["cnt"]),
+                }
+                for row in mitre_rows
+            ]
+
+            # --- Hourly detection trend — last 24 h ---
+            trend_rows = await conn.fetch(
+                """
+                SELECT
+                    date_trunc('hour', created_at) AS hour_bucket,
+                    COUNT(*) AS cnt
+                FROM security.events
+                WHERE created_at >= $1
+                GROUP BY hour_bucket
+                ORDER BY hour_bucket ASC
+                """,
+                day_ago,
+            )
+
+            # Build a complete 24-slot series (fill missing hours with 0)
+            hourly_index: Dict[str, int] = {}
+            for row in trend_rows:
+                key = row["hour_bucket"].strftime("%Y-%m-%dT%H:00:00Z")
+                hourly_index[key] = int(row["cnt"])
+
+            detection_trend = []
+            for h in range(24):
+                bucket_dt = (day_ago + timedelta(hours=h)).replace(
+                    minute=0, second=0, microsecond=0
+                )
+                key = bucket_dt.strftime("%Y-%m-%dT%H:00:00Z")
+                detection_trend.append({"hour": key, "count": hourly_index.get(key, 0)})
+
+        return {
+            "total_detections": {
+                "today": int(total_today or 0),
+                "week": int(total_week or 0),
+                "month": int(total_month or 0),
+            },
+            "severity_breakdown": severity_breakdown,
+            "top_attack_techniques": top_techniques,
+            "top_mitre_techniques": top_mitre_techniques,
+            "detection_trend": detection_trend,
+            "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+    except Exception as e:
+        logger.error("Error retrieving dashboard stats", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve dashboard stats")

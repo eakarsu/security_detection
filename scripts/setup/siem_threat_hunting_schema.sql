@@ -177,6 +177,8 @@ CREATE TABLE IF NOT EXISTS security.mitre_mappings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     detection_type VARCHAR(255),
     detection_rule_id UUID,
+    -- detection_event_id links this mapping to a row in security.events
+    detection_event_id VARCHAR(255),
     tactic_id VARCHAR(20) NOT NULL,
     tactic_name VARCHAR(100) NOT NULL,
     technique_id VARCHAR(20) NOT NULL,
@@ -187,6 +189,13 @@ CREATE TABLE IF NOT EXISTS security.mitre_mappings (
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add detection_event_id to existing deployments (idempotent)
+ALTER TABLE security.mitre_mappings
+    ADD COLUMN IF NOT EXISTS detection_event_id VARCHAR(255);
+
+CREATE INDEX IF NOT EXISTS idx_mitre_mappings_detection_event_id
+    ON security.mitre_mappings (detection_event_id);
 
 CREATE TABLE IF NOT EXISTS security.kill_chains (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

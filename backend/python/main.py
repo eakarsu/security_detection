@@ -39,6 +39,8 @@ from api.services.cache import CacheService
 from api.services.kafka_service import KafkaService
 from api.services.ml_service import MLService
 from api.services.openrouter_service import OpenRouterService
+from api.services.elasticsearch_service import ElasticsearchService
+from api.services.threat_intel_loader import get_threat_intel, start_threat_intel_refresh_loop
 from utils.config import settings, LocalDevSettings, effective_settings
 from utils.logging_config import setup_logging
 
@@ -52,12 +54,13 @@ cache_service: CacheService = None
 kafka_service: KafkaService = None
 ml_service: MLService = None
 openrouter_service: OpenRouterService = None
+es_service: ElasticsearchService = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global db_service, cache_service, kafka_service, ml_service, openrouter_service
+    global db_service, cache_service, kafka_service, ml_service, openrouter_service, es_service
     
     logger.info("Starting NodeGuard AI Security Platform")
     
@@ -84,6 +87,22 @@ async def lifespan(app: FastAPI):
             if not LocalDevSettings.LOCAL_DEV_MODE:
                 raise
         
+        # Elasticsearch — always attempt, gracefully degrade when unavailable
+        try:
+            es_service = ElasticsearchService(
+                url=settings.ELASTICSEARCH_URL,
+                username=settings.ELASTICSEARCH_USERNAME,
+                password=settings.ELASTICSEARCH_PASSWORD,
+            )
+            await es_service.initialize()
+            if es_service.is_local_mode():
+                logger.info("Elasticsearch running in local mode (cluster unreachable)")
+            else:
+                logger.info("Elasticsearch service connected")
+        except Exception as e:
+            logger.warning("Elasticsearch service failed to initialize", error=str(e))
+            es_service = None
+
         # Only initialize Kafka if external services are enabled
         if not LocalDevSettings.DISABLE_EXTERNAL_SERVICES:
             try:
@@ -115,6 +134,14 @@ async def lifespan(app: FastAPI):
             logger.warning("OpenRouter service failed to initialize", error=str(e))
             if not LocalDevSettings.LOCAL_DEV_MODE:
                 raise
+
+        # Initialize threat-intel loader and schedule periodic refresh
+        try:
+            await get_threat_intel().initialize()
+            asyncio.create_task(start_threat_intel_refresh_loop())
+            logger.info("Threat intel loader initialized")
+        except Exception as e:
+            logger.warning("Threat intel loader failed to initialize", error=str(e))
         
         # Background tasks controlled by environment variables
         if (config.ENABLE_THREAT_DETECTION_PIPELINE and 
@@ -197,6 +224,7 @@ app.include_router(siem_router, prefix="/api/siem", tags=["SIEM"])
 app.include_router(hunting_router, prefix="/api/hunting", tags=["Threat Hunting"])
 app.include_router(advanced_detection_router, prefix="/api/advanced-detection", tags=["Advanced Detection"])
 app.include_router(soc_analyst_router, prefix="/api/soc-analyst", tags=["AI SOC Analyst"])
+app.include_router(__import__("api.routes.ai_extras", fromlist=["router"]).router, prefix="/api/ai-extras", tags=["AI Extras"])  # batch 11
 
 
 @app.get("/")

@@ -402,10 +402,17 @@ class KafkaService:
                     return
     
     async def start_security_event_consumer(self):
-        """Start consuming security events from Kafka"""
+        """Start consuming security events from Kafka (no-op in local mode if Kafka is unreachable)"""
+        if not self._connected:
+            logger.warning(
+                "Skipping Kafka consumer startup — Kafka not connected (local mode). "
+                "Real-time event streaming is disabled."
+            )
+            return
+
         try:
             logger.info("Starting security event consumer")
-            
+
             def consume_events():
                 """Consumer thread function"""
                 try:

@@ -63,8 +63,11 @@ class SOCAnalystResponse(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-# In-memory session store
+# In-memory session store kept only as a deprecated fallback for tests.
+# Production traffic now flows through SessionStore (Redis-backed).
 _sessions: Dict[str, List[ChatMessage]] = {}
+
+from .session_store import get_session_store
 
 SOC_ANALYST_SYSTEM_PROMPT = """You are an expert AI SOC (Security Operations Center) Analyst embedded in the NodeGuard AI Security Platform. You assist human security analysts with:
 
@@ -102,24 +105,47 @@ Respond in a structured JSON format with the following fields:
 Be concise but thorough. Prioritize actionable intelligence."""
 
 
+def _msg_to_dict(m: ChatMessage) -> dict:
+    return {
+        "role": m.role.value if hasattr(m.role, "value") else str(m.role),
+        "content": m.content,
+        "timestamp": m.timestamp.isoformat() if hasattr(m.timestamp, "isoformat") else str(m.timestamp),
+        "metadata": m.metadata or {},
+    }
+
+
+def _dict_to_msg(d: dict) -> ChatMessage:
+    return ChatMessage(
+        role=ConversationRole(d.get("role", "user")),
+        content=d.get("content", ""),
+        metadata=d.get("metadata") or {},
+    )
+
+
 class SOCAnalystService:
     """AI-powered SOC Analyst service for interactive security analysis."""
 
     def __init__(self):
-        self.session_store = _sessions
+        self._store = get_session_store()
 
-    def _get_or_create_session(self, session_id: Optional[str] = None) -> tuple[str, List[ChatMessage]]:
-        if session_id and session_id in self.session_store:
-            return session_id, self.session_store[session_id]
+    async def _get_or_create_session(self, session_id: Optional[str] = None) -> tuple[str, List[ChatMessage]]:
+        if session_id:
+            existing = await self._store.get(session_id)
+            if existing:
+                return session_id, [_dict_to_msg(d) for d in existing]
 
         new_id = session_id or f"soc_{uuid.uuid4().hex[:12]}"
-        self.session_store[new_id] = [
+        history = [
             ChatMessage(
                 role=ConversationRole.SYSTEM,
                 content=SOC_ANALYST_SYSTEM_PROMPT,
             )
         ]
-        return new_id, self.session_store[new_id]
+        await self._store.set(new_id, [_msg_to_dict(m) for m in history])
+        return new_id, history
+
+    async def _persist_history(self, session_id: str, history: List[ChatMessage]) -> None:
+        await self._store.set(session_id, [_msg_to_dict(m) for m in history])
 
     def _build_user_prompt(self, request: SOCAnalystRequest) -> str:
         parts = []
@@ -140,7 +166,7 @@ class SOCAnalystService:
     async def analyze(self, request: SOCAnalystRequest) -> SOCAnalystResponse:
         """Process a SOC analyst request through the AI service."""
         start_time = time.time()
-        session_id, history = self._get_or_create_session(request.session_id)
+        session_id, history = await self._get_or_create_session(request.session_id)
 
         user_prompt = self._build_user_prompt(request)
         history.append(ChatMessage(role=ConversationRole.USER, content=user_prompt))
@@ -160,7 +186,9 @@ class SOCAnalystService:
 
             # Trim history to prevent context overflow (keep system + last 40 messages)
             if len(history) > 42:
-                self.session_store[session_id] = [history[0]] + history[-40:]
+                history = [history[0]] + history[-40:]
+
+            await self._persist_history(session_id, history)
 
             parsed = self._parse_response(raw_response)
             processing_time = time.time() - start_time
@@ -188,18 +216,24 @@ class SOCAnalystService:
                 role=ConversationRole.ASSISTANT,
                 content=f"[Fallback response due to: {str(e)}]"
             ))
+            try:
+                await self._persist_history(session_id, history)
+            except Exception:
+                pass
             return self._generate_fallback_response(request, session_id)
 
     def _parse_response(self, raw: str) -> Dict[str, Any]:
-        """Parse AI response, handling both JSON and free-text."""
+        """Parse AI response using the resilient 3-strategy parser."""
         try:
-            if "```json" in raw:
-                start = raw.find("```json") + 7
-                end = raw.find("```", start)
-                return json.loads(raw[start:end].strip())
-            return json.loads(raw)
-        except (json.JSONDecodeError, ValueError):
-            return {"message": raw}
+            from utils.parse_ai_json import parse_ai_json  # type: ignore
+            parsed = parse_ai_json(raw, fallback=None)
+            if isinstance(parsed, dict):
+                return parsed
+            if parsed is not None:
+                return {"message": raw, "data": parsed}
+        except Exception:
+            pass
+        return {"message": raw}
 
     def _generate_fallback_response(self, request: SOCAnalystRequest, session_id: str) -> SOCAnalystResponse:
         """Generate a rule-based fallback when AI is unavailable."""
@@ -308,33 +342,37 @@ class SOCAnalystService:
         )
 
     async def get_session_history(self, session_id: str) -> List[Dict[str, Any]]:
-        """Get conversation history for a session."""
-        if session_id not in self.session_store:
+        """Get conversation history for a session (Redis-backed)."""
+        raw = await self._store.get(session_id)
+        if not raw:
             return []
-
         return [
             {
-                "role": msg.role.value,
-                "content": msg.content,
-                "timestamp": msg.timestamp.isoformat(),
+                "role": d.get("role"),
+                "content": d.get("content"),
+                "timestamp": d.get("timestamp"),
             }
-            for msg in self.session_store[session_id]
-            if msg.role != ConversationRole.SYSTEM
+            for d in raw
+            if d.get("role") != ConversationRole.SYSTEM.value
         ]
 
     async def get_active_sessions(self) -> List[Dict[str, Any]]:
-        """List active SOC analyst sessions."""
-        sessions = []
-        for sid, history in self.session_store.items():
-            user_msgs = [m for m in history if m.role == ConversationRole.USER]
-            if user_msgs:
-                sessions.append({
-                    "session_id": sid,
-                    "message_count": len(history) - 1,  # exclude system prompt
-                    "started_at": history[1].timestamp.isoformat() if len(history) > 1 else None,
-                    "last_message_at": history[-1].timestamp.isoformat(),
-                    "preview": user_msgs[-1].content[:100] if user_msgs else "",
-                })
+        """List active SOC analyst sessions (Redis-backed)."""
+        sessions: List[Dict[str, Any]] = []
+        for sid in await self._store.list_keys(limit=100):
+            raw = await self._store.get(sid)
+            if not raw:
+                continue
+            user_msgs = [m for m in raw if m.get("role") == ConversationRole.USER.value]
+            if not user_msgs:
+                continue
+            sessions.append({
+                "session_id": sid,
+                "message_count": max(0, len(raw) - 1),
+                "started_at": raw[1].get("timestamp") if len(raw) > 1 else None,
+                "last_message_at": raw[-1].get("timestamp"),
+                "preview": (user_msgs[-1].get("content") or "")[:100],
+            })
         return sessions
 
     async def delete_session(self, session_id: str) -> bool:

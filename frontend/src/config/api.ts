@@ -125,6 +125,10 @@ export const ENDPOINTS = {
   advancedDetectionYara: () => getApiEndpoint('/api/advanced-detection/yara', 'python'),
   advancedDetectionCorrelation: () => getApiEndpoint('/api/advanced-detection/correlation', 'python'),
 
+  // Threat Intel Feed Loader endpoints (audit fix: empty malicious IP set)
+  detectionThreatIntelStats: () => getApiEndpoint('/api/detection/threat-intel/stats', 'python'),
+  detectionThreatIntelRefresh: () => getApiEndpoint('/api/detection/threat-intel/refresh', 'python'),
+
   // AI SOC Analyst endpoints
   socAnalystChat: () => getApiEndpoint('/api/soc-analyst/chat', 'python'),
   socAnalystTriage: () => getApiEndpoint('/api/soc-analyst/triage', 'python'),
