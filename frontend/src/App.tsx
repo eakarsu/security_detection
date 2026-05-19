@@ -43,6 +43,7 @@ import DetectionRuleBuilder from './pages/DetectionRuleBuilder.tsx';
 import SOCAnalyst from './pages/SOCAnalyst.tsx';
 import ThreatIntelFeeds from './pages/ThreatIntelFeeds.tsx';
 import AIAnalysis from './pages/AIAnalysis.tsx';
+import CustomViewsPage from './pages/CustomViewsPage.js';
 
 // Hooks
 import { AuthProvider, useAuth } from './hooks/useAuth.tsx';
@@ -192,6 +193,7 @@ const AppContent: React.FC = () => {
                     <Route path="/soc-analyst" element={<SOCAnalyst />} />
                     <Route path="/threat-intel-feeds" element={<ThreatIntelFeeds />} />
                     <Route path="/ai-analysis" element={<AIAnalysis />} />
+                    <Route path="/custom-views" element={<CustomViewsPage />} />
                   </Routes>
                 </Box>
               </Box>
