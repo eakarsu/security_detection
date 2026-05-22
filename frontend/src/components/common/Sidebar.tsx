@@ -23,6 +23,7 @@ import {
   Timeline as KillChainIcon,
   Rule as DetectionIcon,
   SmartToy as SOCAnalystIcon,
+  VisibilityOutlined as CustomViewsIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -40,6 +41,7 @@ const menuItems = [
   { text: 'Kill Chain', icon: <KillChainIcon />, path: '/kill-chain' },
   { text: 'Detection Rules', icon: <DetectionIcon />, path: '/detection-rules' },
   { text: 'AI SOC Analyst', icon: <SOCAnalystIcon />, path: '/soc-analyst' },
+  { text: 'Security Views', icon: <CustomViewsIcon />, path: '/custom-views' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];
 
