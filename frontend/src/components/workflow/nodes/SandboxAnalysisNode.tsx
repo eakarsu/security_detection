@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { Box, Typography, Chip, Grid, Paper } from '@mui/material';
-import { Security, BugReport, Timer, CheckCircle } from '@mui/icons-material';
+import { Security } from '@mui/icons-material';
 
 interface SandboxAnalysisNodeProps {
   data: {

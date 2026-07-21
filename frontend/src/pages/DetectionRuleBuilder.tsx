@@ -3,8 +3,7 @@ import {
   Box, Typography, Tabs, Tab, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, TextField, Button,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
-  FormControl, InputLabel, Select, MenuItem, Switch, FormControlLabel,
-  Grid, Card, CardContent,
+  FormControl, InputLabel, Select, MenuItem,
 } from '@mui/material';
 import { Add, Delete, PlayArrow, Science } from '@mui/icons-material';
 import toast from 'react-hot-toast';

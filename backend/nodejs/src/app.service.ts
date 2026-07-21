@@ -18,11 +18,11 @@ export class AppService {
     uptime: number;
   } {
     return {
-      status: 'healthy',
+      status: 'running',
       services: {
-        database: 'connected',
-        redis: 'connected',
-        kafka: 'connected',
+        database: 'initialized-before-bootstrap',
+        redis: 'not_checked',
+        kafka: 'not_checked',
       },
       uptime: Date.now() - this.startTime,
     };
@@ -34,9 +34,9 @@ export class AppService {
     frontendUrl: string;
   } {
     return {
-      pythonApiUrl: process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:8000',
-      nodejsApiUrl: process.env.REACT_APP_API_URL || 'http://localhost:3001',
-      frontendUrl: process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000',
+      pythonApiUrl: process.env.PUBLIC_PYTHON_API_URL || 'http://localhost:8000',
+      nodejsApiUrl: process.env.PUBLIC_NODEJS_API_URL || 'http://localhost:3001',
+      frontendUrl: process.env.PUBLIC_FRONTEND_URL || 'http://localhost:3000',
     };
   }
 }

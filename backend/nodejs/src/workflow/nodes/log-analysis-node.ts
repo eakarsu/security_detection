@@ -175,7 +175,7 @@ export interface LogAnalysisResult {
 }
 
 @Injectable()
-export class LogAnalysisNode extends SecurityNode {
+export class LogAnalysisNode extends SecurityNode<LogAnalysisInput, LogAnalysisConfig, LogAnalysisResult> {
   id = 'log-analysis';
   type = 'analysis';
   category = 'core' as const;
@@ -628,7 +628,9 @@ export class LogAnalysisNode extends SecurityNode {
 
     // Source anomalies (new or unusual sources)
     const sources = [...new Set(logs.map(log => log.source))];
-    const knownSources = baseline.knownSources || [];
+    const knownSources: string[] = Array.isArray(baseline.knownSources)
+      ? baseline.knownSources as string[]
+      : [];
     const newSources = sources.filter(source => !knownSources.includes(source));
     
     if (newSources.length > 0) {

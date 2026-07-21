@@ -1,12 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as compression from 'compression';
-import * as express from 'express';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const customViewsRouter = require('./customViews');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -25,25 +22,6 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // Body parser explicitly so /api/custom-views POST routes get JSON
-  app.use(express.json({ limit: '2mb' }));
-
-  // Permissive CORS for the standalone custom-views router
-  app.use('/api/custom-views', (req: any, res: any, next: any) => {
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-    if (req.method === 'OPTIONS') return res.status(204).end();
-    next();
-  });
-
-  // Mount custom views BEFORE setGlobalPrefix so it lives at /api/custom-views
-  app.use('/api/custom-views', (req: any, _res: any, next: any) => {
-    console.log('[custom-views]', req.method, req.url);
-    next();
-  });
-  app.use('/api/custom-views', customViewsRouter);
-
   // Global validation pipe
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
@@ -52,7 +30,13 @@ async function bootstrap() {
   }));
 
   // API prefix
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: [
+      { path: 'api/auth/login', method: RequestMethod.POST },
+      { path: 'api/auth/register', method: RequestMethod.POST },
+      { path: 'api/auth/me', method: RequestMethod.GET },
+    ],
+  });
 
   // Swagger documentation
   const config = new DocumentBuilder()

@@ -35,6 +35,42 @@ class Incident(BaseModel):
     event_type: Optional[str] = None
 
 
+def _incident_from_row(row: Any) -> Incident:
+    """Map a persisted security event without inventing incident details."""
+    event_type = row["event_type"]
+    title = event_type.replace("_", " ").title()
+    if row["user_id"]:
+        title += f" - User: {row['user_id']}"
+    elif row["source_ip"]:
+        title += f" - IP: {row['source_ip']}"
+
+    tags = [event_type]
+    if row["source_ip"]:
+        tags.append("network")
+    if row["user_id"]:
+        tags.append("user_activity")
+    if row["ml_score"] is not None and float(row["ml_score"]) > 0.8:
+        tags.append("high_confidence")
+
+    return Incident(
+        incident_id=str(row["id"]),
+        title=title,
+        description=row["description"] or "",
+        severity=row["severity"],
+        status=row["status"],
+        created_at=row["created_at"].isoformat() + "Z",
+        updated_at=row["updated_at"].isoformat() + "Z",
+        assigned_to=str(row["assigned_to"]) if row["assigned_to"] else None,
+        tags=tags,
+        source_ip=str(row["source_ip"]) if row["source_ip"] else None,
+        destination_ip=str(row["destination_ip"]) if row["destination_ip"] else None,
+        user_id=row["user_id"],
+        endpoint=row["endpoint"],
+        ml_score=float(row["ml_score"]) if row["ml_score"] is not None else None,
+        event_type=event_type,
+    )
+
+
 @router.get("")
 @router.get("/")
 async def get_incidents(
@@ -106,42 +142,7 @@ async def get_incidents(
 
             rows = await conn.fetch(data_query, *params)
 
-        incidents = []
-        for row in rows:
-            # Create title based on event type and description
-            title = f"{row['event_type'].replace('_', ' ').title()}"
-            if row['user_id']:
-                title += f" - User: {row['user_id']}"
-            elif row['source_ip']:
-                title += f" - IP: {row['source_ip']}"
-
-            # Extract tags from event type and other fields
-            tags = [row['event_type']]
-            if row['source_ip']:
-                tags.append("network")
-            if row['user_id']:
-                tags.append("user_activity")
-            if row['ml_score'] and row['ml_score'] > 0.8:
-                tags.append("high_confidence")
-
-            incident = Incident(
-                incident_id=str(row['id']),
-                title=title,
-                description=row['description'],
-                severity=row['severity'],
-                status=row['status'],
-                created_at=row['created_at'].isoformat() + 'Z',
-                updated_at=row['updated_at'].isoformat() + 'Z',
-                assigned_to=str(row['assigned_to']) if row['assigned_to'] else None,
-                tags=tags,
-                source_ip=str(row['source_ip']) if row['source_ip'] else None,
-                destination_ip=str(row['destination_ip']) if row['destination_ip'] else None,
-                user_id=row['user_id'],
-                endpoint=row['endpoint'],
-                ml_score=float(row['ml_score']) if row['ml_score'] else None,
-                event_type=row['event_type']
-            )
-            incidents.append(incident)
+        incidents = [_incident_from_row(row) for row in rows]
 
         return paginate(
             items=[incident.dict() for incident in incidents],
@@ -194,21 +195,26 @@ async def get_incident_count() -> dict:
 
 @router.get("/{incident_id}", response_model=Incident)
 async def get_incident(incident_id: str) -> Incident:
-    """Get specific incident"""
+    """Get a specific persisted incident."""
     try:
-        # Mock data
-        return Incident(
-            incident_id=incident_id,
-            title="Sample Security Incident",
-            description="Detailed incident description",
-            severity="high",
-            status="investigating",
-            created_at="2025-08-02T12:00:00Z",
-            updated_at="2025-08-02T12:30:00Z",
-            assigned_to="security_analyst_1",
-            tags=["malware", "endpoint"]
-        )
-        
+        db_service = await get_database_service()
+        connection_context = await db_service.get_connection_context()
+        async with connection_context as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT id, event_type, description, severity, status, source_ip,
+                       destination_ip, user_id, endpoint, ml_score, created_at,
+                       updated_at, assigned_to
+                FROM security.events
+                WHERE id = $1::uuid
+                """,
+                incident_id,
+            )
+        if row is None:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        return _incident_from_row(row)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error retrieving incident", error=str(e), incident_id=incident_id)
         raise HTTPException(status_code=500, detail="Failed to retrieve incident")
@@ -278,13 +284,30 @@ async def create_incident(incident_data: Dict[str, Any]) -> Incident:
 
 @router.put("/{incident_id}", response_model=Incident)
 async def update_incident(incident_id: str, incident: Incident) -> Incident:
-    """Update existing incident"""
+    """Update incident lifecycle fields while preserving source evidence."""
     try:
         logger.info("Updating incident", incident_id=incident_id, title=incident.title)
-        # Mock update - would update in database
-        incident.incident_id = incident_id
-        return incident
-        
+        db_service = await get_database_service()
+        connection_context = await db_service.get_connection_context()
+        async with connection_context as conn:
+            row = await conn.fetchrow(
+                """
+                UPDATE security.events
+                SET status = $2, assigned_to = $3::uuid, updated_at = NOW()
+                WHERE id = $1::uuid
+                RETURNING id, event_type, description, severity, status, source_ip,
+                          destination_ip, user_id, endpoint, ml_score, created_at,
+                          updated_at, assigned_to
+                """,
+                incident_id,
+                incident.status,
+                incident.assigned_to,
+            )
+        if row is None:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        return _incident_from_row(row)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Error updating incident", error=str(e), incident_id=incident_id)
         raise HTTPException(status_code=500, detail="Failed to update incident")
@@ -292,12 +315,11 @@ async def update_incident(incident_id: str, incident: Incident) -> Incident:
 
 @router.delete("/{incident_id}")
 async def delete_incident(incident_id: str) -> dict:
-    """Delete incident"""
-    try:
-        logger.info("Deleting incident", incident_id=incident_id)
-        # Mock deletion - would delete from database
-        return {"message": f"Incident {incident_id} deleted successfully"}
-        
-    except Exception as e:
-        logger.error("Error deleting incident", error=str(e), incident_id=incident_id)
-        raise HTTPException(status_code=500, detail="Failed to delete incident")
+    """Never destroy source evidence through the incident API."""
+    raise HTTPException(
+        status_code=405,
+        detail=(
+            "Incident evidence cannot be deleted. Apply a documented retention "
+            "policy through the investigation-case workflow."
+        ),
+    )

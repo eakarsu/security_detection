@@ -211,16 +211,8 @@ class SOCAnalystService:
             )
 
         except Exception as e:
-            logger.error("SOC Analyst analysis failed, using fallback", error=str(e))
-            history.append(ChatMessage(
-                role=ConversationRole.ASSISTANT,
-                content=f"[Fallback response due to: {str(e)}]"
-            ))
-            try:
-                await self._persist_history(session_id, history)
-            except Exception:
-                pass
-            return self._generate_fallback_response(request, session_id)
+            logger.error("SOC Analyst provider analysis failed", error=str(e))
+            raise RuntimeError("SOC Analyst provider analysis failed") from e
 
     def _parse_response(self, raw: str) -> Dict[str, Any]:
         """Parse AI response using the resilient 3-strategy parser."""
@@ -384,50 +376,40 @@ class SOCAnalystService:
 
     async def get_quick_stats(self) -> Dict[str, Any]:
         """Get quick stats for the SOC analyst dashboard."""
-        # Pull live data from the database when available
-        try:
-            from main import db_service
-            if db_service and db_service.is_connected():
-                stats = await self._fetch_live_stats(db_service)
-                return stats
-        except Exception as e:
-            logger.warning("Could not fetch live stats", error=str(e))
+        from .database import get_database_service
 
-        return self._get_mock_stats()
+        database = await get_database_service()
+        return await self._fetch_live_stats(database)
 
     async def _fetch_live_stats(self, db_service) -> Dict[str, Any]:
         """Fetch live statistics from database."""
-        try:
-            result = await db_service.execute(
-                "SELECT severity, COUNT(*) as count FROM security.events WHERE status = 'open' GROUP BY severity"
+        await db_service.ensure_connected()
+        connection_context = await db_service.get_connection_context()
+        async with connection_context as connection:
+            row = await connection.fetchrow(
+                """
+                SELECT
+                  COUNT(*) FILTER (WHERE status IN ('open', 'investigating')) AS open_alerts,
+                  COUNT(*) FILTER (WHERE status IN ('open', 'investigating') AND LOWER(severity)='critical') AS critical_alerts,
+                  COUNT(*) FILTER (WHERE status IN ('open', 'investigating') AND LOWER(severity)='high') AS high_alerts,
+                  COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') AS alerts_last_24h,
+                  COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at-created_at))/60)
+                    FILTER (WHERE status IN ('resolved', 'closed')), 0) AS mean_triage_time_min,
+                  COALESCE(
+                    COUNT(*) FILTER (WHERE status='false_positive')::float /
+                    NULLIF(COUNT(*) FILTER (WHERE status IN ('false_positive', 'resolved', 'closed')), 0),
+                    0
+                  ) AS false_positive_rate
+                FROM security.events
+                """
             )
-            open_by_severity = {row["severity"]: row["count"] for row in result} if result else {}
-
-            total_open = sum(open_by_severity.values())
-            critical = open_by_severity.get("critical", 0) + open_by_severity.get("CRITICAL", 0)
-            high = open_by_severity.get("high", 0) + open_by_severity.get("HIGH", 0)
-
-            return {
-                "open_alerts": total_open,
-                "critical_alerts": critical,
-                "high_alerts": high,
-                "active_incidents": total_open,
-                "mean_triage_time_min": 12,
-                "alerts_last_24h": total_open,
-                "false_positive_rate": 0.15,
-                "active_sessions": len(self.session_store),
-            }
-        except Exception:
-            return self._get_mock_stats()
-
-    def _get_mock_stats(self) -> Dict[str, Any]:
         return {
-            "open_alerts": 47,
-            "critical_alerts": 3,
-            "high_alerts": 12,
-            "active_incidents": 8,
-            "mean_triage_time_min": 14,
-            "alerts_last_24h": 156,
-            "false_positive_rate": 0.18,
-            "active_sessions": len(self.session_store),
+            "open_alerts": row["open_alerts"],
+            "critical_alerts": row["critical_alerts"],
+            "high_alerts": row["high_alerts"],
+            "active_incidents": row["open_alerts"],
+            "mean_triage_time_min": float(row["mean_triage_time_min"]),
+            "alerts_last_24h": row["alerts_last_24h"],
+            "false_positive_rate": float(row["false_positive_rate"]),
+            "active_sessions": len(await self._store.list_keys(limit=100)),
         }

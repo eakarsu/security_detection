@@ -7,7 +7,7 @@ interface AuthState {
   isLoading: boolean;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; first_name: string; last_name: string; role?: string }) => Promise<{ message: string }>;
+  register: (data: { email: string; password: string; first_name: string; last_name: string }) => Promise<{ message: string }>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
@@ -48,13 +48,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem(USER_KEY);
         }
       } catch {
-        // Network error - use cached user data
-        try {
-          setUser(JSON.parse(savedUser));
-        } catch {
-          localStorage.removeItem(TOKEN_KEY);
-          localStorage.removeItem(USER_KEY);
-        }
+        // Fail closed when the server cannot validate the session.
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
       } finally {
         setIsLoading(false);
       }
@@ -81,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(data.user);
   }, []);
 
-  const register = useCallback(async (data: { email: string; password: string; first_name: string; last_name: string; role?: string }) => {
+  const register = useCallback(async (data: { email: string; password: string; first_name: string; last_name: string }) => {
     const response = await fetch(ENDPOINTS.authRegister(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

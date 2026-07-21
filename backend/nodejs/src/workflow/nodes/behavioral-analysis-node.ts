@@ -96,7 +96,7 @@ export interface BehavioralResult {
 }
 
 @Injectable()
-export class BehavioralAnalysisNode extends SecurityNode {
+export class BehavioralAnalysisNode extends SecurityNode<BehavioralInput, BehavioralConfig, BehavioralResult> {
   id = 'behavioral-analysis';
   type = 'analysis';
   category = 'ai-ml' as const;
@@ -302,7 +302,7 @@ export class BehavioralAnalysisNode extends SecurityNode {
         isAnomalous: anomalies.length > 0 && riskScore >= (config.anomalyThreshold * 100),
         confidence: this.calculateConfidence(anomalies, windowEvents.length),
         patterns: {
-          baseline: baseline.patterns,
+          baseline: baseline.patterns as BehavioralResult['patterns']['baseline'],
           current: currentPatterns
         },
         anomalies,

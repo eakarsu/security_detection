@@ -133,7 +133,7 @@ export interface NetworkTrafficResult {
 }
 
 @Injectable()
-export class NetworkTrafficMonitorNode extends SecurityNode {
+export class NetworkTrafficMonitorNode extends SecurityNode<NetworkTrafficInput, NetworkMonitorConfig, NetworkTrafficResult> {
   id = 'network-traffic-monitor';
   type = 'monitor';
   category = 'core' as const;
@@ -601,7 +601,10 @@ export class NetworkTrafficMonitorNode extends SecurityNode {
     return anomalies;
   }
 
-  private async analyzeTopTalkers(flowData: any[], config: NetworkMonitorConfig) {
+  private async analyzeTopTalkers(
+    flowData: any[],
+    config: NetworkMonitorConfig,
+  ): Promise<NetworkTrafficResult['topTalkers']> {
     const talkers = {};
     
     flowData.forEach(flow => {
@@ -624,7 +627,7 @@ export class NetworkTrafficMonitorNode extends SecurityNode {
         bytesOut: stats.bytesOut,
         bytesIn: stats.bytesIn,
         connections: stats.connections.size,
-        protocols: Array.from(stats.protocols),
+        protocols: Array.from(stats.protocols) as string[],
         geoLocation: this.getGeoLocation(ip),
         reputation: this.getIPReputation(ip)
       }))

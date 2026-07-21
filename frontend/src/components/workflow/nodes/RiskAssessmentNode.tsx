@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { Box, Typography, Chip, LinearProgress } from '@mui/material';
-import { Assessment, TrendingUp, Warning, CheckCircle } from '@mui/icons-material';
+import { Assessment, Warning, CheckCircle } from '@mui/icons-material';
 
 interface RiskAssessmentNodeProps {
   data: {

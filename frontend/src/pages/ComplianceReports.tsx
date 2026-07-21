@@ -18,7 +18,6 @@ import {
   DialogActions,
   TextField,
   Alert,
-  CircularProgress,
   LinearProgress,
   Stack,
   Avatar,
@@ -33,13 +32,11 @@ import {
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
-  Download as DownloadIcon,
   Refresh as RefreshIcon,
   Add as AddIcon,
   CheckCircle as CheckCircleIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
-  Info as InfoIcon,
   Security as SecurityIcon,
   Policy as PolicyIcon,
   ExpandMore as ExpandMoreIcon,
@@ -253,6 +250,27 @@ const ComplianceReports: React.FC = () => {
           </Card>
         </Grid>
       </Grid>
+
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>Generated Reports</Typography>
+        <Stack spacing={1}>
+          {reports.map((report) => (
+            <Button
+              key={report.id}
+              variant="outlined"
+              onClick={() => {
+                setSelectedReport(report);
+                setDialogOpen(true);
+              }}
+              sx={{ justifyContent: 'space-between' }}
+            >
+              <span>{report.framework}</span>
+              <span>{report.score}% · {report.status}</span>
+            </Button>
+          ))}
+          {reports.length === 0 && <Typography color="text.secondary">No reports have been generated.</Typography>}
+        </Stack>
+      </Paper>
 
       {/* Frameworks */}
       <Paper sx={{ p: 3, mb: 3 }}>

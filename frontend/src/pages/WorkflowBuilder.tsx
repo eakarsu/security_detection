@@ -11,7 +11,6 @@ import {
   ListItemText,
   Divider,
   IconButton,
-  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -37,11 +36,9 @@ import {
   Security as SecurityIcon,
   Notifications as AlertIcon,
   Storage as DatabaseIcon,
-  Code as CodeIcon,
 } from '@mui/icons-material';
 import ReactFlow, {
   Node,
-  Edge,
   addEdge,
   Connection,
   useNodesState,
@@ -50,9 +47,9 @@ import ReactFlow, {
   Background,
   MiniMap,
   NodeTypes,
-  EdgeTypes,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { ENDPOINTS } from '../config/api.ts';
 
 // Custom Node Components
 import InputNode from '../components/workflow/nodes/InputNode.tsx';
@@ -319,7 +316,6 @@ const WorkflowBuilder: React.FC = () => {
   // Load saved workflows on component mount
   const loadSavedWorkflows = useCallback(async () => {
     try {
-      const { ENDPOINTS } = await import('../config/api.ts');
       const response = await fetch(ENDPOINTS.workflows());
       if (response.ok) {
         const workflows = await response.json();
@@ -342,7 +338,6 @@ const WorkflowBuilder: React.FC = () => {
     if (!confirmed) return;
     
     try {
-      const { ENDPOINTS } = await import('../config/api.ts');
       const response = await fetch(`${ENDPOINTS.workflows()}/${workflowId}`, {
         method: 'DELETE',
       });
@@ -426,9 +421,6 @@ const WorkflowBuilder: React.FC = () => {
     };
 
     try {
-      // Import API endpoints
-      const { ENDPOINTS } = await import('../config/api.ts');
-      
       // Save workflow to backend
       const response = await fetch(ENDPOINTS.workflows(), {
         method: 'POST',
@@ -451,14 +443,12 @@ const WorkflowBuilder: React.FC = () => {
       console.error('Failed to save workflow:', error);
       alert(`Failed to save workflow: ${error.message}`);
     }
-  }, [nodes, edges]);
+  }, [nodes, edges, loadSavedWorkflows]);
 
   const runWorkflow = useCallback(async () => {
     setWorkflowRunning(true);
     
     try {
-      // First save the workflow to get an ID
-      const workflowId = `workflow-${Date.now()}`;
       const workflow = {
         name: 'Temporary Workflow',
         description: 'Workflow execution test',
@@ -467,9 +457,6 @@ const WorkflowBuilder: React.FC = () => {
         isActive: true
       };
 
-      // Import API endpoints
-      const { ENDPOINTS } = await import('../config/api.ts');
-      
       // Create workflow first
       const createResponse = await fetch(ENDPOINTS.workflows(), {
         method: 'POST',
@@ -480,26 +467,7 @@ const WorkflowBuilder: React.FC = () => {
       });
 
       if (!createResponse.ok) {
-        console.log('Creating workflow failed, executing locally...');
-        
-        // Local simulation of workflow execution
-        const simulatedResult = {
-          workflowId: workflowId,
-          executionId: Date.now().toString(),
-          status: 'completed',
-          startTime: new Date().toISOString(),
-          endTime: new Date().toISOString(),
-          results: {
-            inputProcessed: true,
-            nodesExecuted: nodes.length,
-            edgesProcessed: edges.length,
-            message: 'Workflow executed successfully (simulated)'
-          }
-        };
-        
-        console.log('Workflow execution result:', simulatedResult);
-        alert('Workflow executed successfully! Check console for details.');
-        return;
+        throw new Error(`Workflow creation failed: ${createResponse.status}`);
       }
 
       const createdWorkflow = await createResponse.json();

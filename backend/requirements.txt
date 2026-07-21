@@ -1,0 +1,2 @@
+# Operator bootstrap scripts use only Python's standard library and the
+# project-owned Node dependencies. Application dependencies live in python/.

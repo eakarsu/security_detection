@@ -1,12 +1,3 @@
-// === Batch 11 Gaps & Frontend Mounts ===
-import GapUebaPage from './pages/gap/GapUebaPage'
-import GapPlaybookGeneratorPage from './pages/gap/GapPlaybookGeneratorPage'
-import GapPhishingClassifierPage from './pages/gap/GapPhishingClassifierPage'
-import GapLogShippersPage from './pages/gap/GapLogShippersPage'
-import GapSoarTicketingPage from './pages/gap/GapSoarTicketingPage'
-import GapRealtimeDashboardPage from './pages/gap/GapRealtimeDashboardPage'
-import GapMultitenantPage from './pages/gap/GapMultitenantPage'
-import GapMsspPortalPage from './pages/gap/GapMsspPortalPage'
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from 'react-query';
@@ -43,13 +34,9 @@ import DetectionRuleBuilder from './pages/DetectionRuleBuilder.tsx';
 import SOCAnalyst from './pages/SOCAnalyst.tsx';
 import ThreatIntelFeeds from './pages/ThreatIntelFeeds.tsx';
 import AIAnalysis from './pages/AIAnalysis.tsx';
-import CustomViewsPage from './pages/CustomViewsPage.js';
 
 // Hooks
 import { AuthProvider, useAuth } from './hooks/useAuth.tsx';
-
-import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
-import CodexOperationsFeature from './pages/CodexOperationsFeature';
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -156,9 +143,6 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AppContent: React.FC = () => {
   return (
     <Routes>
-        <Route path="/codex/custom-viz" element={<ProtectedRoute><CodexCustomVizFeature /></ProtectedRoute>} />
-        <Route path="/codex/operations" element={<ProtectedRoute><CodexOperationsFeature /></ProtectedRoute>} />
-
       {/* Public routes */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
@@ -199,7 +183,6 @@ const AppContent: React.FC = () => {
                     <Route path="/soc-analyst" element={<SOCAnalyst />} />
                     <Route path="/threat-intel-feeds" element={<ThreatIntelFeeds />} />
                     <Route path="/ai-analysis" element={<AIAnalysis />} />
-                    <Route path="/custom-views" element={<CustomViewsPage />} />
                   </Routes>
                 </Box>
               </Box>
@@ -207,15 +190,6 @@ const AppContent: React.FC = () => {
           </ProtectedRoute>
         }
       />
-          {/* === Batch 11 Gaps & Frontend Mounts === */}
-        <Route path="/gap/ueba" element={<GapUebaPage />} />
-        <Route path="/gap/playbook-generator" element={<GapPlaybookGeneratorPage />} />
-        <Route path="/gap/phishing-classifier" element={<GapPhishingClassifierPage />} />
-        <Route path="/gap/log-shippers" element={<GapLogShippersPage />} />
-        <Route path="/gap/soar-ticketing" element={<GapSoarTicketingPage />} />
-        <Route path="/gap/realtime-dashboard" element={<GapRealtimeDashboardPage />} />
-        <Route path="/gap/multitenant" element={<GapMultitenantPage />} />
-        <Route path="/gap/mssp-portal" element={<GapMsspPortalPage />} />
       </Routes>
   );
 };

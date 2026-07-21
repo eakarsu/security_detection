@@ -76,7 +76,7 @@ export interface EmailAnalysisResult {
 }
 
 @Injectable()
-export class EmailAnalysisNode extends SecurityNode {
+export class EmailAnalysisNode extends SecurityNode<EmailAnalysisInput, EmailAnalysisConfig, EmailAnalysisResult> {
   id = 'email-analysis';
   type = 'analysis';
   category = 'core' as const;

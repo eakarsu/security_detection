@@ -1,25 +1,6 @@
 -- NodeGuard AI Security Platform Database Initialization
--- This script sets up the initial database schema and data
-
--- Create database if it doesn't exist (handled by Docker)
--- CREATE DATABASE IF NOT EXISTS nodeguard;
-
--- Use the nodeguard database
--- \c nodeguard;
-
--- Create the nodeguard user if it doesn't exist
--- Note: The password should match POSTGRES_PASSWORD in .env file
-DO
-$do$
-BEGIN
-   IF NOT EXISTS (
-      SELECT FROM pg_catalog.pg_roles
-      WHERE  rolname = 'nodeguard') THEN
-      
-      CREATE ROLE nodeguard LOGIN PASSWORD 'NodeGuard2025!SecureDB';
-   END IF;
-END
-$do$;
+-- This script creates schema only. Users, credentials, and demo records are
+-- provisioned separately so ordinary startup never creates weak accounts.
 
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -136,42 +117,6 @@ CREATE INDEX IF NOT EXISTS idx_threat_intel_type ON security.threat_intel(indica
 CREATE INDEX IF NOT EXISTS idx_metrics_name_timestamp ON analytics.metrics(metric_name, timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(user_id, action);
 
--- Insert default admin user (password: admin123 - change in production!)
-INSERT INTO users (email, password_hash, first_name, last_name, role) 
-VALUES (
-    'admin@nodeguard.ai', 
-    crypt('admin123', gen_salt('bf')), 
-    'System', 
-    'Administrator', 
-    'admin'
-) ON CONFLICT (email) DO NOTHING;
-
--- Insert sample analyst user
-INSERT INTO users (email, password_hash, first_name, last_name, role) 
-VALUES (
-    'analyst@nodeguard.ai', 
-    crypt('analyst123', gen_salt('bf')), 
-    'Security', 
-    'Analyst', 
-    'analyst'
-) ON CONFLICT (email) DO NOTHING;
-
--- Insert sample threat intelligence data
-INSERT INTO security.threat_intel (indicator_type, indicator_value, threat_type, confidence_score, source, description) 
-VALUES 
-    ('ip', '192.168.1.100', 'malware', 0.85, 'internal_detection', 'Suspicious internal IP with malware indicators'),
-    ('domain', 'malicious-site.com', 'phishing', 0.92, 'threat_feed', 'Known phishing domain'),
-    ('hash', 'a1b2c3d4e5f6', 'malware', 0.78, 'virus_total', 'Malicious file hash detected')
-ON CONFLICT DO NOTHING;
-
--- Insert sample security events
-INSERT INTO security.events (event_type, severity, source_ip, destination_ip, user_id, description, ml_score, status) 
-VALUES 
-    ('failed_login', 'medium', '192.168.1.50', '192.168.1.10', 'user123', 'Multiple failed login attempts detected', 0.75, 'open'),
-    ('suspicious_traffic', 'high', '10.0.0.100', '8.8.8.8', 'system', 'Unusual outbound traffic pattern detected', 0.89, 'investigating'),
-    ('malware_detection', 'critical', '192.168.1.75', NULL, 'user456', 'Malware detected on endpoint', 0.95, 'open')
-ON CONFLICT DO NOTHING;
-
 -- Create a function to update the updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -182,16 +127,9 @@ END;
 $$ language 'plpgsql';
 
 -- Create triggers for updated_at
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+DROP TRIGGER IF EXISTS update_events_updated_at ON security.events;
+DROP TRIGGER IF EXISTS update_playbooks_updated_at ON workflows.playbooks;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON security.events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_playbooks_updated_at BEFORE UPDATE ON workflows.playbooks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
--- Grant permissions
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA security TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA analytics TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA workflows TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA security TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA analytics TO nodeguard;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA workflows TO nodeguard;

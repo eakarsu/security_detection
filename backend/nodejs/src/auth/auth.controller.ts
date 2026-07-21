@@ -10,7 +10,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { VerifyEmailDto, ResendVerificationDto } from './dto/verify-email.dto';
 
 @ApiTags('Authentication')
-@Controller('auth')
+@Controller(['auth', 'api/auth'])
 export class AuthController {
   constructor(private authService: AuthService) {}
 
@@ -82,7 +82,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Get('profile')
+  @Get(['profile', 'me'])
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiResponse({ status: 200, description: 'User profile' })

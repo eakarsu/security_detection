@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Docker Compose configuration for using pre-built Docker Hub images
 # Usage: docker-compose -f docker-compose.hub.yml up -d
 
@@ -11,12 +9,11 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-nodeguard}
       POSTGRES_USER: ${POSTGRES_USER:-nodeguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/setup/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./scripts/setup/reset-db.sql:/docker-entrypoint-initdb.d/02-reset-db.sql
-      - ./scripts/setup/seed_security_data.sql:/docker-entrypoint-initdb.d/03-seed-data.sql
+      - ./scripts/setup/migrations/20260720_investigation_cases.sql:/docker-entrypoint-initdb.d/02-investigation-cases.sql:ro
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     networks:
@@ -139,7 +136,7 @@ services:
       - "${PYTHON_API_PORT:-8000}:8000"    # Python API
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-nodeguard}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nodeguard}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB:-nodeguard}
@@ -151,14 +148,33 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-      - JWT_SECRET=${JWT_SECRET}
+      - ALERT_PROVIDER_URL=${ALERT_PROVIDER_URL}
+      - ALERT_PROVIDER_TOKEN=${ALERT_PROVIDER_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - JWT_ISSUER=${JWT_ISSUER:-nodeguard-auth}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-nodeguard-api}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - CASE_STORAGE_URL=${CASE_STORAGE_URL}
+      - CASE_STORAGE_TOKEN=${CASE_STORAGE_TOKEN}
+      - CASE_OCR_URL=${CASE_OCR_URL}
+      - CASE_OCR_TOKEN=${CASE_OCR_TOKEN}
+      - CASE_ESIGN_URL=${CASE_ESIGN_URL}
+      - CASE_ESIGN_TOKEN=${CASE_ESIGN_TOKEN}
+      - CASE_FILING_URL=${CASE_FILING_URL}
+      - CASE_FILING_TOKEN=${CASE_FILING_TOKEN}
+      - CASE_TEMPLATE_URL=${CASE_TEMPLATE_URL}
+      - CASE_TEMPLATE_TOKEN=${CASE_TEMPLATE_TOKEN}
+      - CASE_TEMPLATE_ALLOWED_AUTHORITIES=${CASE_TEMPLATE_ALLOWED_AUTHORITIES}
+      - CASE_TEMPLATE_ALLOWED_HOSTS=${CASE_TEMPLATE_ALLOWED_HOSTS}
       - DEFAULT_MODEL=${DEFAULT_MODEL:-anthropic/claude-3.5-sonnet}
       - FALLBACK_MODEL=${FALLBACK_MODEL:-openai/gpt-4o-mini}
       - MAX_TOKENS=${MAX_TOKENS:-4000}
       - TEMPERATURE=${TEMPERATURE:-0.1}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - NODE_ENV=${NODE_ENV:-production}
+      - PUBLIC_NODEJS_API_URL=${PUBLIC_NODEJS_API_URL:-http://localhost:3001}
+      - PUBLIC_PYTHON_API_URL=${PUBLIC_PYTHON_API_URL:-http://localhost:8000}
+      - PUBLIC_FRONTEND_URL=${PUBLIC_FRONTEND_URL:-http://localhost:3000}
     depends_on:
       postgres:
         condition: service_healthy

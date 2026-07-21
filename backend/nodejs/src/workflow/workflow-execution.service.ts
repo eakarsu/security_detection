@@ -234,20 +234,8 @@ export class WorkflowExecutionService {
       };
 
     } catch (error) {
-      // Fallback to basic scoring if ML API unavailable
-      this.logger.warn('ML API unavailable, using fallback scoring', { error: error.message });
-      
-      const fallbackScore = (inputData.risk_score / 10.0) || 0.5;
-      return {
-        model: 'fallback',
-        threshold,
-        score: fallbackScore,
-        confidence: 0.6,
-        exceedsThreshold: fallbackScore >= threshold,
-        features: config.features || [],
-        analysis: 'Fallback scoring based on risk_score',
-        processingTime: 0.01
-      };
+      this.logger.error('ML API unavailable; workflow node failed closed', { error: error.message });
+      throw new Error(`ML scoring provider failed: ${error.message}`);
     }
   }
 
@@ -257,22 +245,12 @@ export class WorkflowExecutionService {
     
     // Check rate limit before making AI call
     if (!this.checkAiRateLimit(context.workflowId)) {
-      this.logger.warn('AI analysis rate limit exceeded, using cached/fallback analysis', {
+      this.logger.warn('AI analysis rate limit exceeded; workflow node failed closed', {
         workflowId: context.workflowId,
         nodeId: node.id
       });
       
-      return {
-        model: 'rate_limited',
-        analysisType: 'cached',
-        analysis: `Rate limit exceeded. Basic threat analysis: ${inputData.threat_type || 'Unknown'}. Risk score: ${inputData.risk_score || 0}`,
-        recommendations: ['Review incident manually', 'Check for false positives'],
-        confidence: 0.6,
-        threatLevel: inputData.severity?.toLowerCase() || 'medium',
-        indicators: [inputData.source_ip, inputData.threat_type].filter(Boolean),
-        processingTime: 0.001,
-        rateLimited: true
-      };
+      throw new Error('AI analysis rate limit exceeded');
     }
     
     try {
@@ -302,18 +280,8 @@ export class WorkflowExecutionService {
       };
 
     } catch (error) {
-      this.logger.warn('AI analysis API unavailable, using fallback', { error: error.message });
-      
-      return {
-        model: 'fallback',
-        analysisType: 'basic',
-        analysis: `Security threat detected: ${inputData.threat_type || 'Unknown'}. Risk score: ${inputData.risk_score || 0}`,
-        recommendations: ['Monitor closely', 'Investigate source'],
-        confidence: 0.7,
-        threatLevel: inputData.severity?.toLowerCase() || 'medium',
-        indicators: [inputData.source_ip, inputData.threat_type].filter(Boolean),
-        processingTime: 0.01
-      };
+      this.logger.error('AI analysis API unavailable; workflow node failed closed', { error: error.message });
+      throw new Error(`AI analysis provider failed: ${error.message}`);
     }
   }
 
@@ -351,25 +319,8 @@ export class WorkflowExecutionService {
       };
 
     } catch (error) {
-      this.logger.warn('Correlation API unavailable, using fallback', { error: error.message });
-      
-      // Fallback correlation logic
-      const correlationKey = groupBy.map(field => inputData[field] || 'unknown').join('|');
-      
-      return {
-        timeWindow,
-        groupBy,
-        correlationKey,
-        relatedEvents: 0,
-        relatedEventIds: [],
-        pattern: 'single_event',
-        riskAdjustment: 1.0,
-        anomalyScore: 0.5,
-        summary: `Fallback correlation by ${groupBy.join(', ')} within ${timeWindow}`,
-        correlationStrength: 'unknown',
-        temporalPatterns: [],
-        frequencyAnalysis: {}
-      };
+      this.logger.error('Correlation API unavailable; workflow node failed closed', { error: error.message });
+      throw new Error(`Correlation provider failed: ${error.message}`);
     }
   }
 
@@ -427,34 +378,8 @@ export class WorkflowExecutionService {
       };
 
     } catch (error) {
-      this.logger.warn('Alert API unavailable, using fallback notification', { error: error.message });
-      
-      // Fallback alert handling
-      const fallbackAlertId = `fallback-alert-${context.executionId}`;
-      
-      // Log the alert details for manual review
-      this.logger.log('Fallback alert generated', {
-        alertId: fallbackAlertId,
-        severity,
-        threatType: inputData.threat_type,
-        sourceIp: inputData.source_ip,
-        eventId: inputData.event_id,
-        mlScore: mlResult?.score || 0,
-        aiThreatLevel: aiResult?.threatLevel || severity,
-        correlationPattern: correlationResult?.pattern || 'unknown'
-      });
-
-      return {
-        alertGenerated: true,
-        alertId: fallbackAlertId,
-        status: 'fallback_logged',
-        channels: recipients,
-        severity: severity,
-        dispatchTime: new Date().toISOString(),
-        deliveryStatus: { 'fallback_log': 'logged' },
-        alertType: 'fallback',
-        recipients: recipients
-      };
+      this.logger.error('Alert API unavailable; workflow node failed closed', { error: error.message });
+      throw new Error(`Alert provider failed: ${error.message}`);
     }
   }
 
@@ -541,36 +466,13 @@ export class WorkflowExecutionService {
         });
 
       } catch (error) {
-        this.logger.warn(`Response action failed, using fallback`, { 
+        this.logger.error(`Response action failed closed`, {
           actionType, 
           target, 
           error: error.message 
         });
         
-        // Fallback response handling
-        const fallbackActionId = `fallback-${actionType}-${context.executionId}`;
-        
-        responseResults.push({
-          action: actionType,
-          actionId: fallbackActionId,
-          status: 'fallback_logged',
-          target: target,
-          executionTime: new Date().toISOString(),
-          result: { success: false, error: error.message, method: 'fallback' },
-          autoRevertAt: null,
-          message: `${actionType} logged for manual execution`
-        });
-
-        // Log fallback action for manual review
-        this.logger.log('Fallback response action logged', {
-          actionId: fallbackActionId,
-          actionType,
-          target,
-          reason: error.message,
-          workflowId: context.workflowId,
-          severity: severity,
-          requiresManualExecution: true
-        });
+        throw new Error(`Response provider failed for ${actionType}: ${error.message}`);
       }
     }
 

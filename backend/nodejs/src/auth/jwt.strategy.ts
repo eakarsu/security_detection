@@ -1,6 +1,7 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
+import { jwtSecret } from '../config/required-env';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -8,11 +9,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'nodeguard-secret-key',
+      secretOrKey: jwtSecret(),
+      issuer: process.env.JWT_ISSUER || 'nodeguard-auth',
+      audience: process.env.JWT_AUDIENCE || 'nodeguard-api',
     });
   }
 
   async validate(payload: any) {
-    return { userId: payload.sub, email: payload.email, role: payload.role };
+    return { userId: payload.sub, tenantId: payload.tenant_id, email: payload.email, role: payload.role };
   }
 }

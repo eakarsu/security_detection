@@ -135,7 +135,7 @@ export interface FileHashResult {
 }
 
 @Injectable()
-export class FileHashAnalysisNode extends SecurityNode {
+export class FileHashAnalysisNode extends SecurityNode<FileHashInput, FileHashConfig, FileHashResult> {
   id = 'file-hash-analysis';
   type = 'analysis';
   category = 'core' as const;
@@ -314,12 +314,16 @@ export class FileHashAnalysisNode extends SecurityNode {
     }
   }
 
-  private async analyzeFile(file: FileHashInput['files'][0], config: FileHashConfig, scanMode: string) {
+  private async analyzeFile(
+    file: FileHashInput['files'][0],
+    config: FileHashConfig,
+    scanMode: string,
+  ): Promise<FileHashResult['fileResults'][number]> {
     // Calculate hashes if not provided
     const hashes = file.hashes || await this.calculateHashes(file, config.hashTypes);
     
     // Initialize file result
-    const fileResult = {
+    const fileResult: FileHashResult['fileResults'][number] = {
       filename: file.filename,
       filepath: file.filepath,
       size: file.size,
@@ -330,7 +334,7 @@ export class FileHashAnalysisNode extends SecurityNode {
         sha512: hashes.sha512
       },
       reputation: {
-        overall: 'unknown' as const,
+        overall: 'unknown',
         confidence: 0,
         sources: []
       },
@@ -375,9 +379,12 @@ export class FileHashAnalysisNode extends SecurityNode {
     return fileResult;
   }
 
-  private async calculateHashes(file: FileHashInput['files'][0], hashTypes: string[]) {
+  private async calculateHashes(
+    file: FileHashInput['files'][0],
+    hashTypes: string[],
+  ): Promise<NonNullable<FileHashInput['files'][number]['hashes']>> {
     // Simulate hash calculation
-    const hashes = {};
+    const hashes: NonNullable<FileHashInput['files'][number]['hashes']> = {};
     
     if (hashTypes.includes('md5')) {
       hashes['md5'] = this.generateMockHash(32);

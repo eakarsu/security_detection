@@ -1,51 +1,67 @@
-#  iAI-Powered Cybersecurity Detection System
+# NodeGuard security detection and investigation
 
-A    comprehensive cybersecurity detection system using OpenRouter API with Sonnet 4 model for advanced threat detection and analysis.
+NodeGuard combines security telemetry services with a governed incident-investigation case workflow. The case workflow is the production-focused journey in this repository: it records evidence provenance and versions, enforces tenant and case permissions, requires independent legal review, integrates external OCR/storage/signature/filing/template providers, applies legal holds and retention, and writes a tamper-resistant audit chain.
 
-## Features
+The external provider adapters are real HTTPS contracts. They fail closed when credentials, allowlists, or provider evidence are missing; the application does not fabricate a successful OCR, signature, filing, storage, or authoritative-template result.
 
-- **Continuous Network Monitoring**: Real-time packet capture and deep analysis
-- **Endpoint Security**: Behavioral profiling and telemetry analysis
-- **Centralized Logging**: AI-powered correlation across systems
-- **Threat Intelligence Integration**: External threat feeds integration
-- **Hybrid AI Detection**: Classical ML + Sonnet 4 for advanced analysis
-- **Automated Response**: Real-time alerting and incident response
-- **User Behavior Analytics**: Insider threat and credential misuse detection
-- **Forensics & Audit**: Automated evidence gathering and compliance reporting
-- **Secure Access Management**: MFA and RBAC enforcement
+## Prerequisites
 
-## Architecture
+- Python 3.12 and PostgreSQL 16
+- Node.js 22
+- Docker Compose when running the container stack
+- Real provider endpoints and credentials for the governed case journey
 
-- **Microservices**: REST/gRPC APIs for modularity
-- **Kubernetes**: Orchestration and auto-scaling
-- **Kafka**: Real-time streaming
-- **Redis**: In-memory caching
-- **PostgreSQL**: Primary data storage
-- **ElasticSearch**: Search and analytics
-- **OpenRouter + Sonnet 4**: Advanced AI analysis
+Copy `.env.example` to a private `.env`, replace every placeholder, and keep that file out of version control. `JWT_SECRET` must be a random value of at least 32 characters. Template authority and source-host allowlists must be approved by counsel for the jurisdictions being operated.
 
-## Quick Start
+## Safe startup
 
-1. Clone the repository
-2. Install dependencies: `./install.sh`
-3. Configure environment variables in `.env`
-4. Choose your deployment method:
-   - **Development**: `./start-local.sh` (recommended)
-   - **Production**: `./deploy.sh deploy`
+Startup never creates, migrates, resets, or seeds a database and never kills a process that it did not start.
 
-## API Documentation
+Apply the reviewed schema explicitly:
 
-See `/docs` for detailed API documentation and integration guides.
+```sh
+psql -v ON_ERROR_STOP=1 -f scripts/setup/init.sql
+psql -v ON_ERROR_STOP=1 -f scripts/setup/migrations/20260720_investigation_cases.sql
+```
 
-## Compliance
+For local processes, install dependencies in `backend/python/venv`, `backend/nodejs`, and `frontend`, ensure PostgreSQL and Redis are already available, export required secrets, then run:
 
-Supports GDPR, HIPAA, and other regulatory standards with automated compliance reporting.
+```sh
+./start-local.sh
+```
 
-## KPIs Tracked
+For containers:
 
-- Detection accuracy (true positive rate)
-- False positive rate
-- Mean response latency
-- Incident response time
-- System uptime (99.9% target)
-- Analyst satisfaction scores
+```sh
+./docker-start.sh
+```
+
+`./stop-local.sh` stops only this project's Compose services and preserves volumes. Rebuild scripts preserve containers and data as well.
+
+## Investigation-case journey
+
+All `/api/investigation-cases` routes require an HS256 bearer token with verified `iss`, `aud`, `sub`, `tenant_id`, and `role` claims. A normal journey is:
+
+1. Create a case; the service resolves and validates the authoritative jurisdiction template and its effective date.
+2. Grant case-scoped access and upload evidence. Storage and OCR provenance is recorded with a content hash and immutable document version.
+3. Submit for review. A different counsel/admin user with `LEGAL_REVIEWER` access must confirm jurisdiction and effective date.
+4. Request and reconcile an e-signature, then file with the configured provider. Calls use idempotency keys and persist provider references.
+5. Export with privileged-document redaction by default, place or release legal holds, and perform retention disposal only when due.
+
+The state transition and provider contracts are documented in `docs/INVESTIGATION_CASE_OPERATIONS.md`. FastAPI exposes the request schema at `/docs` when Swagger is enabled.
+
+## Verification
+
+CI replays the schema and case migration twice against PostgreSQL, runs Python risk and database integration tests, compiles both APIs and the frontend, audits dependencies, scans the checked-out tree for secrets, and validates Compose.
+
+Focused local commands:
+
+```sh
+pytest -q backend/python/tests
+(cd backend/nodejs && npm ci --ignore-scripts && npm run build && npm audit --audit-level=high)
+(cd frontend && npm ci --ignore-scripts && npm run build && npm audit --audit-level=high)
+```
+
+## Production release gates
+
+Passing tests is not legal approval. Before serving a jurisdiction, counsel must approve the authority/host allowlists, template versions and effective dates, retention period, privilege policy, and export policy. Operators must also configure real provider accounts, run backup/restore and disaster-recovery exercises, and monitor provider failures and audit-chain verification.

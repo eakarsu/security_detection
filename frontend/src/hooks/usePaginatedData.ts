@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiGet } from '../utils/apiClient.ts';
 import type { PaginatedResponse } from '../types/index.ts';
@@ -28,6 +28,7 @@ interface UsePaginatedDataReturn<T> {
 
 export function usePaginatedData<T = any>(options: UsePaginatedDataOptions): UsePaginatedDataReturn<T> {
   const { endpoint, defaultPageSize = 20, extraParams = {} } = options;
+  const extraParamsKey = useMemo(() => JSON.stringify(extraParams), [extraParams]);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [data, setData] = useState<T[]>([]);
@@ -88,7 +89,7 @@ export function usePaginatedData<T = any>(options: UsePaginatedDataOptions): Use
         const params = new URLSearchParams({
           page: String(page),
           page_size: String(pageSize),
-          ...extraParams,
+          ...JSON.parse(extraParamsKey),
         });
         if (search) params.set('search', search);
 
@@ -124,7 +125,7 @@ export function usePaginatedData<T = any>(options: UsePaginatedDataOptions): Use
     return () => {
       cancelled = true;
     };
-  }, [endpoint, page, pageSize, search, refreshKey, searchParams]);
+  }, [endpoint, page, pageSize, search, refreshKey, searchParams, extraParamsKey]);
 
   return {
     data,

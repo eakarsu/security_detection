@@ -34,7 +34,6 @@ import {
 import {
   Security,
   Notifications,
-  Storage,
   Api,
   Shield,
   Settings as SettingsIcon,
@@ -42,7 +41,6 @@ import {
   Delete,
   Add,
   Save,
-  Refresh,
   Lock as LockIcon,
 } from '@mui/icons-material';
 import toast from 'react-hot-toast';

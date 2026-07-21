@@ -91,23 +91,11 @@ async def analyze_threat(request: AIAnalysisRequest) -> AIAnalysisResponse:
             context_included=request.include_context
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("AI analysis failed", error=str(e))
-
-        # Fallback analysis if AI service fails
-        fallback_result = generate_fallback_analysis(request.event_data)
-        processing_time = (datetime.utcnow() - start_time).total_seconds()
-        
-        return AIAnalysisResponse(
-            analysis=fallback_result["analysis"],
-            recommendations=fallback_result["recommendations"],
-            confidence=0.6,  # Lower confidence for fallback
-            threat_level=fallback_result["threat_level"],
-            indicators=fallback_result["indicators"],
-            processing_time=processing_time,
-            model_used="fallback",
-            context_included=False
-        )
+        raise HTTPException(status_code=502, detail="AI provider analysis failed") from e
 
 
 @router.post("/explain")
@@ -116,7 +104,7 @@ async def explain_threat(event_data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         from main import openrouter_service
         if not openrouter_service:
-            return generate_rule_based_explanation(event_data)
+            raise HTTPException(status_code=503, detail="AI service not available")
         
         # Create explanation-focused prompt
         explanation_prompt = build_explanation_prompt(event_data)
@@ -138,9 +126,11 @@ async def explain_threat(event_data: Dict[str, Any]) -> Dict[str, Any]:
             "confidence": ai_result.confidence if hasattr(ai_result, 'confidence') else 0.8
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Threat explanation failed", error=str(e))
-        return generate_rule_based_explanation(event_data)
+        raise HTTPException(status_code=502, detail="AI provider explanation failed") from e
 
 
 @router.post("/recommend")
@@ -149,7 +139,7 @@ async def get_recommendations(event_data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         from main import openrouter_service
         if not openrouter_service:
-            return generate_standard_recommendations(event_data)
+            raise HTTPException(status_code=503, detail="AI service not available")
         
         # Focus on actionable recommendations
         recommendation_prompt = build_recommendation_prompt(event_data)
@@ -171,9 +161,11 @@ async def get_recommendations(event_data: Dict[str, Any]) -> Dict[str, Any]:
             "confidence": ai_result.confidence if hasattr(ai_result, 'confidence') else 0.8
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Recommendation generation failed", error=str(e))
-        return generate_standard_recommendations(event_data)
+        raise HTTPException(status_code=502, detail="AI provider recommendation failed") from e
 
 
 def build_threat_analysis_request(event_data: Dict[str, Any], request: AIAnalysisRequest) -> ThreatAnalysisRequest:

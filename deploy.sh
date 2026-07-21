@@ -232,17 +232,8 @@ case "${1:-deploy}" in
     "health")
         health_check
         ;;
-    "clean")
-        print_warning "This will remove all containers, images, and volumes!"
-        read -p "Are you sure? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            docker-compose -f docker-compose.prod.yml down -v --rmi all --remove-orphans
-            docker system prune -af
-        fi
-        ;;
     *)
-        echo "Usage: $0 {deploy|stop|restart|logs [service]|status|health|clean}"
+        echo "Usage: $0 {deploy|stop|restart|logs [service]|status|health}"
         echo
         echo "Commands:"
         echo "  deploy   - Deploy the entire stack (default)"
@@ -251,7 +242,6 @@ case "${1:-deploy}" in
         echo "  logs     - View logs (optionally for specific service)"
         echo "  status   - Show service status and URLs"
         echo "  health   - Run health checks"
-        echo "  clean    - Remove everything (DESTRUCTIVE)"
         exit 1
         ;;
 esac

@@ -1,9 +1,9 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { createHash, randomUUID } from 'crypto';
 import { User } from './entities/user.entity';
 import { EmailService } from './email.service';
 import { RegisterDto } from './dto/register.dto';
@@ -38,6 +38,7 @@ export class AuthService {
         first_name: user.first_name,
         last_name: user.last_name,
         role: user.role,
+        tenant_id: user.tenant_id,
         status: user.status,
       };
     }
@@ -45,7 +46,7 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { email: user.email, sub: user.id, role: user.role };
+    const payload = { email: user.email, sub: user.id, role: user.role, tenant_id: user.tenant_id };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -65,22 +66,27 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const verificationToken = uuidv4();
+    const verificationToken = randomUUID();
 
     const user = this.userRepository.create({
       email: dto.email,
       password_hash: passwordHash,
       first_name: dto.first_name,
       last_name: dto.last_name,
-      role: dto.role || 'viewer',
+      role: 'viewer',
       status: 'pending',
-      email_verification_token: verificationToken,
+      email_verification_token: this.tokenDigest(verificationToken),
       is_active: true,
     });
 
     const saved = await this.userRepository.save(user);
 
-    await this.emailService.sendVerificationEmail(dto.email, verificationToken);
+    try {
+      await this.emailService.sendVerificationEmail(dto.email, verificationToken);
+    } catch (error) {
+      await this.userRepository.delete(saved.id);
+      throw new ServiceUnavailableException('Verification email provider is unavailable');
+    }
 
     return {
       message: 'Registration successful. Please check your email to verify your account.',
@@ -101,8 +107,8 @@ export class AuthService {
       return { message: 'If the email exists, a password reset link has been sent.' };
     }
 
-    const resetToken = uuidv4();
-    user.password_reset_token = resetToken;
+    const resetToken = randomUUID();
+    user.password_reset_token = this.tokenDigest(resetToken);
     user.password_reset_expires_at = new Date(Date.now() + 3600000); // 1 hour
     await this.userRepository.save(user);
 
@@ -113,7 +119,7 @@ export class AuthService {
 
   async resetPassword(dto: ResetPasswordDto) {
     const user = await this.userRepository.findOne({
-      where: { password_reset_token: dto.token },
+      where: { password_reset_token: this.tokenDigest(dto.token) },
     });
 
     if (!user || !user.password_reset_expires_at || user.password_reset_expires_at < new Date()) {
@@ -156,7 +162,7 @@ export class AuthService {
 
   async verifyEmail(dto: VerifyEmailDto) {
     const user = await this.userRepository.findOne({
-      where: { email_verification_token: dto.token },
+      where: { email_verification_token: this.tokenDigest(dto.token) },
     });
 
     if (!user) {
@@ -177,8 +183,8 @@ export class AuthService {
       return { message: 'If the email exists and is not verified, a verification link has been sent.' };
     }
 
-    const verificationToken = uuidv4();
-    user.email_verification_token = verificationToken;
+    const verificationToken = randomUUID();
+    user.email_verification_token = this.tokenDigest(verificationToken);
     await this.userRepository.save(user);
 
     await this.emailService.sendVerificationEmail(dto.email, verificationToken);
@@ -203,5 +209,9 @@ export class AuthService {
       last_login_at: user.last_login_at,
       created_at: user.created_at,
     };
+  }
+
+  private tokenDigest(token: string): string {
+    return createHash('sha256').update(token, 'utf8').digest('hex');
   }
 }

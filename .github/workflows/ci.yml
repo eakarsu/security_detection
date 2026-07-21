@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  investigation-cases:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: nodeguard_test
+          POSTGRES_USER: nodeguard_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nodeguard_test -d nodeguard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://nodeguard_test@127.0.0.1:5432/nodeguard_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate ephemeral validation credentials
+        run: |
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "OPENROUTER_API_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "ENCRYPTION_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/python/requirements.txt
+      - name: Install focused test dependencies
+        run: >-
+          python -m pip install
+          asyncpg pydantic pydantic-settings structlog fastapi httpx
+          'PyJWT[crypto]' pytest pytest-asyncio pip-audit
+      - name: Replay schema and migration twice
+        env:
+          PGHOST: 127.0.0.1
+          PGUSER: nodeguard_test
+          PGDATABASE: nodeguard_test
+        run: |
+          for pass in 1 2; do
+            psql -v ON_ERROR_STOP=1 -f scripts/setup/init.sql
+            psql -v ON_ERROR_STOP=1 -f scripts/setup/migrations/20260720_investigation_cases.sql
+          done
+      - name: Run Python risk and integration tests
+        run: pytest -q backend/python/tests
+      - name: Compile Python application
+        run: python -m compileall -q backend/python
+      - name: Audit focused Python dependencies
+        run: |
+          python - <<'PY' > /tmp/focused-audit-requirements.txt
+          from importlib.metadata import version
+          for package in (
+              "asyncpg", "pydantic", "pydantic-settings", "structlog",
+              "fastapi", "httpx", "PyJWT", "pytest", "pytest-asyncio",
+          ):
+              print(f"{package}=={version(package)}")
+          PY
+          pip-audit --progress-spinner=off --requirement /tmp/focused-audit-requirements.txt
+
+  node-api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/nodejs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/nodejs/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm audit --audit-level=low
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm audit --audit-level=low
+
+  configuration-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan the checked-out tree for secrets
+        run: >-
+          docker run --rm -v "$PWD:/repo"
+          zricethezav/gitleaks:v8.30.1
+          dir /repo --no-banner --redact
+      - name: Validate Compose configuration
+        run: >-
+          POSTGRES_PASSWORD="$(openssl rand -hex 32)"
+          JWT_SECRET="$(openssl rand -hex 32)"
+          docker compose --env-file .env.example config --quiet

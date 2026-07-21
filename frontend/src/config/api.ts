@@ -15,7 +15,7 @@ export const initializeConfig = async (): Promise<ApiConfig> => {
   
   try {
     // Fetch runtime config from Node.js API
-    const response = await fetch('/api/config');
+    const response = await fetch('/api/v1/config');
     if (response.ok) {
       API_CONFIG = await response.json();
       console.log('🔧 Runtime API Configuration loaded:', API_CONFIG);
@@ -26,9 +26,9 @@ export const initializeConfig = async (): Promise<ApiConfig> => {
     console.warn('Failed to load runtime config, using build-time defaults:', error);
     // Fallback to build-time environment variables
     API_CONFIG = {
-      pythonApiUrl: process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:8000',
-      nodejsApiUrl: process.env.REACT_APP_API_URL || 'http://localhost:3001',
-      frontendUrl: process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000'
+      pythonApiUrl: import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000',
+      nodejsApiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+      frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3000'
     };
     console.log('🔧 Build-time API Configuration used:', API_CONFIG);
     return API_CONFIG;
@@ -41,9 +41,9 @@ export const getApiConfig = (): ApiConfig => {
     // Fallback to build-time config if not initialized
     console.warn('API Config not initialized, using build-time fallback');
     return {
-      pythonApiUrl: process.env.REACT_APP_PYTHON_API_URL || 'http://localhost:8000',
-      nodejsApiUrl: process.env.REACT_APP_API_URL || 'http://localhost:3001',
-      frontendUrl: process.env.REACT_APP_FRONTEND_URL || 'http://localhost:3000'
+      pythonApiUrl: import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000',
+      nodejsApiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+      frontendUrl: import.meta.env.VITE_FRONTEND_URL || 'http://localhost:3000'
     };
   }
   return API_CONFIG;

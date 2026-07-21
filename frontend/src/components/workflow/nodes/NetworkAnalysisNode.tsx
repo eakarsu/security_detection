@@ -1,7 +1,7 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { Box, Typography, Chip, Grid, Paper } from '@mui/material';
-import { NetworkCheck, Router, Speed, Timeline } from '@mui/icons-material';
+import { NetworkCheck } from '@mui/icons-material';
 
 interface NetworkAnalysisNodeProps {
   data: {

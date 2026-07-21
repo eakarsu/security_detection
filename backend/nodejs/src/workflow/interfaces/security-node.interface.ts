@@ -37,7 +37,7 @@ export interface NodeSchema {
   }[];
   config: {
     name: string;
-    type: 'string' | 'number' | 'boolean' | 'select' | 'object' | 'array';
+    type: 'string' | 'number' | 'boolean' | 'select' | 'multiselect' | 'object' | 'array';
     required: boolean;
     default?: any;
     options?: string[];
@@ -50,7 +50,11 @@ export interface ValidationResult {
   errors: string[];
 }
 
-export abstract class SecurityNode {
+export abstract class SecurityNode<
+  TInput = SecurityEvent,
+  TConfig extends SecurityNodeConfig = SecurityNodeConfig,
+  TResult = SecurityResult,
+> {
   abstract id: string;
   abstract type: string;
   abstract category: 'core' | 'soar' | 'cloud' | 'ai-ml' | 'integration' | 'mitre';
@@ -58,7 +62,7 @@ export abstract class SecurityNode {
   abstract description: string;
   abstract version: string;
 
-  abstract execute(input: SecurityEvent, config: SecurityNodeConfig): Promise<SecurityResult>;
+  abstract execute(input: TInput, config: TConfig): Promise<TResult>;
   abstract configure(params: SecurityNodeConfig): ValidationResult;
   abstract getSchema(): NodeSchema;
 

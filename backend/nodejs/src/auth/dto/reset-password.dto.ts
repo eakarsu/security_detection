@@ -8,7 +8,7 @@ export class ResetPasswordDto {
 
   @ApiProperty({ example: 'NewSecurePass123' })
   @IsString()
-  @MinLength(8)
+  @MinLength(12)
   @MaxLength(128)
   new_password: string;
 }

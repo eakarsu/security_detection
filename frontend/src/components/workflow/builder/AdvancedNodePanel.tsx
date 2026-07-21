@@ -107,9 +107,6 @@ export const AdvancedNodePanel: React.FC<AdvancedNodePanelProps> = ({
           marginBottom: '12px',
           boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
           transition: 'all 0.2s ease',
-          ':hover': {
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-          }
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';

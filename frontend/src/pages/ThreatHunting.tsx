@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Tabs, Tab, Paper, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, TextField, Button,
   Dialog, DialogTitle, DialogContent, DialogActions, IconButton,
   FormControl, InputLabel, Select, MenuItem, Card, CardContent,
-  Grid, Collapse, LinearProgress, CircularProgress, TextareaAutosize,
+  Grid, Collapse, LinearProgress, CircularProgress,
 } from '@mui/material';
-import { Add, Delete, ExpandMore, ExpandLess, Refresh, Download } from '@mui/icons-material';
+import { Add, Delete, ExpandMore, ExpandLess, Download } from '@mui/icons-material';
 import toast from 'react-hot-toast';
 import { ENDPOINTS } from '../config/api.ts';
 

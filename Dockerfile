@@ -51,13 +51,13 @@ COPY frontend/package*.json ./
 RUN npm ci --no-audit --no-fund && npm cache clean --force
 COPY frontend/ .
 
-# Set React environment variables for build (passed from docker-compose)
-ARG REACT_APP_API_URL
-ARG REACT_APP_PYTHON_API_URL
-ARG REACT_APP_FRONTEND_URL
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
-ENV REACT_APP_PYTHON_API_URL=$REACT_APP_PYTHON_API_URL
-ENV REACT_APP_FRONTEND_URL=$REACT_APP_FRONTEND_URL
+# Set Vite environment variables for the static build.
+ARG VITE_API_URL
+ARG VITE_PYTHON_API_URL
+ARG VITE_FRONTEND_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_PYTHON_API_URL=$VITE_PYTHON_API_URL
+ENV VITE_FRONTEND_URL=$VITE_FRONTEND_URL
 
 RUN npm run build
 
@@ -67,7 +67,7 @@ COPY backend/nodejs/package*.json ./
 COPY backend/nodejs/tsconfig.json ./
 RUN npm ci
 COPY backend/nodejs/ .
-RUN rm -rf dist && npm run build || echo "Build completed with warnings"
+RUN rm -rf dist && npm run build
 
 # Setup Python API
 WORKDIR /app/backend/python
@@ -84,7 +84,7 @@ RUN npm install -g serve
 # Copy ML models
 COPY models/ ./models/
 
-# Copy database seed scripts
+# Copy schema and migration scripts for deliberate operator use only.
 COPY scripts/setup/ ./scripts/setup/
 
 # Create necessary directories
@@ -95,17 +95,6 @@ COPY <<EOF /etc/supervisor/conf.d/supervisord.conf
 [supervisord]
 nodaemon=true
 user=root
-
-[program:db-seeder]
-command=/app/seed-database.sh
-directory=/app
-autostart=true
-autorestart=false
-startsecs=0
-exitcodes=0
-stderr_logfile=/app/logs/db-seeder.log
-stdout_logfile=/app/logs/db-seeder.log
-priority=1
 
 [program:python-api]
 command=/app/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
@@ -135,32 +124,6 @@ stderr_logfile=/app/logs/frontend.log
 stdout_logfile=/app/logs/frontend.log
 priority=20
 EOF
-
-# Database seeding script
-COPY <<EOF /app/seed-database.sh
-#!/bin/bash
-echo "Waiting for database to be ready..."
-# Wait for database to be available
-while ! nc -z postgres 5432; do
-  echo "Waiting for database..."
-  sleep 2
-done
-
-echo "Database is ready. Starting seeding process..."
-sleep 5
-
-# Run database seeding
-echo "Running seed script: /app/scripts/setup/seed_security_data.sql"
-PGPASSWORD=\${POSTGRES_PASSWORD} psql -h postgres -U \${POSTGRES_USER:-nodeguard} -d \${POSTGRES_DB:-nodeguard} -f /app/scripts/setup/seed_security_data.sql
-
-if [ \$? -eq 0 ]; then
-    echo "Database seeding completed successfully!"
-else
-    echo "Database seeding failed!"
-    exit 1
-fi
-EOF
-RUN chmod +x /app/seed-database.sh
 
 # Health check script
 COPY <<EOF /app/health-check.sh

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box,
@@ -16,9 +16,6 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth.tsx';
 
-const DEFAULT_EMAIL = 'admin@nodeguard.ai';
-const DEFAULT_PASSWORD = 'Admin1234';
-
 interface LoginFormData {
   email: string;
   password: string;
@@ -29,36 +26,14 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoLoginAttempted = useRef(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-    setValue,
   } = useForm<LoginFormData>({
-    defaultValues: { email: DEFAULT_EMAIL, password: DEFAULT_PASSWORD },
+    defaultValues: { email: '', password: '' },
   });
-
-  // Auto-login on mount
-  useEffect(() => {
-    if (autoLoginAttempted.current) return;
-    autoLoginAttempted.current = true;
-
-    const autoLogin = async () => {
-      setLoading(true);
-      try {
-        await login(DEFAULT_EMAIL, DEFAULT_PASSWORD);
-        toast.success('Welcome back!');
-        navigate('/');
-      } catch (err) {
-        setError('Auto-login failed. Please sign in manually.');
-        setLoading(false);
-      }
-    };
-
-    autoLogin();
-  }, [login, navigate]);
 
   const onSubmit = async (data: LoginFormData) => {
     setLoading(true);
@@ -125,8 +100,8 @@ const Login: React.FC = () => {
               {...register('password', {
                 required: 'Password is required',
                 minLength: {
-                  value: 6,
-                  message: 'Password must be at least 6 characters',
+                  value: 12,
+                  message: 'Password must be at least 12 characters',
                 },
               })}
               error={!!errors.password}

@@ -117,12 +117,7 @@ stop_existing_containers() {
     print_success "Existing containers stopped"
 }
 
-# Clean up dangling images and containers
-cleanup_docker() {
-    print_status "Cleaning up unused Docker resources..."
-    docker system prune -f >/dev/null 2>&1 || true
-    print_success "Docker cleanup completed"
-}
+# Deployment intentionally does not prune host-wide Docker resources.
 
 # Create necessary directories
 create_directories() {
@@ -286,7 +281,6 @@ main() {
     
     pull_latest_image
     stop_existing_containers
-    cleanup_docker
     
     deploy_platform
     wait_for_services

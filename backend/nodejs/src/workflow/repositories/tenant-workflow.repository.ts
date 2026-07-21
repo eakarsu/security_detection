@@ -12,11 +12,7 @@ export class TenantWorkflowRepository extends BaseTenantRepository<Workflow> {
     private workflowRepository: Repository<Workflow>,
     @Inject('REQUEST') request: Request
   ) {
-    super(Workflow, workflowRepository.manager, null);
-    this.setTenantId(this.extractTenantFromRequest(request));
-    // Copy repository properties
-    Object.setPrototypeOf(this, workflowRepository);
-    Object.assign(this, workflowRepository);
+    super(Workflow, workflowRepository.manager, request);
   }
 
   /**

@@ -1,4 +1,4 @@
-import { Repository, SelectQueryBuilder, FindOptionsWhere, FindManyOptions, FindOneOptions, EntityTarget, DataSource } from 'typeorm';
+import { Repository, SelectQueryBuilder, FindOptionsWhere, FindManyOptions, FindOneOptions, EntityTarget, EntityManager } from 'typeorm';
 import { Injectable, Inject } from '@nestjs/common';
 import { Request } from 'express';
 
@@ -6,10 +6,10 @@ import { Request } from 'express';
 export abstract class BaseTenantRepository<T> extends Repository<T> {
   constructor(
     target: EntityTarget<T>,
-    dataSource: DataSource,
+    manager: EntityManager,
     @Inject('REQUEST') private readonly request: Request
   ) {
-    super(target, dataSource.createEntityManager());
+    super(target, manager);
   }
 
   /**

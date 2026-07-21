@@ -47,22 +47,15 @@ export class EmailService {
   }
 
   private async sendMail(to: string, subject: string, html: string): Promise<void> {
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: process.env.SMTP_FROM || 'noreply@nodeguard.ai',
-          to,
-          subject,
-          html,
-        });
-        this.logger.log(`Email sent to ${to}: ${subject}`);
-      } catch (error) {
-        this.logger.error(`Failed to send email to ${to}`, error);
-      }
-    } else {
-      this.logger.log(`[DEV] Email to ${to}`);
-      this.logger.log(`[DEV] Subject: ${subject}`);
-      this.logger.log(`[DEV] Body: ${html}`);
+    if (!this.transporter) {
+      throw new Error('SMTP provider is not configured');
     }
+    await this.transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@nodeguard.ai',
+      to,
+      subject,
+      html,
+    });
+    this.logger.log(`Email delivered to configured recipient`);
   }
 }

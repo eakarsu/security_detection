@@ -9,6 +9,10 @@ from pydantic import BaseModel, EmailStr
 import structlog
 from datetime import datetime
 import json
+import os
+from urllib.parse import urlparse
+
+import httpx
 
 logger = structlog.get_logger(__name__)
 
@@ -90,56 +94,6 @@ async def dispatch_alert(request: AlertRequest) -> AlertResponse:
     except Exception as e:
         logger.error("Alert dispatch failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"Alert dispatch failed: {str(e)}")
-
-
-@router.post("/template")
-async def create_alert_template(template_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Create custom alert template"""
-    try:
-        template_id = f"template_{int(datetime.utcnow().timestamp())}"
-        
-        # Validate template structure
-        required_fields = ["name", "subject_template", "body_template", "alert_type"]
-        if not all(field in template_data for field in required_fields):
-            raise HTTPException(status_code=400, detail="Missing required template fields")
-        
-        # Store template (in production, this would go to database)
-        logger.info("Alert template created", 
-                   template_id=template_id,
-                   name=template_data["name"],
-                   alert_type=template_data["alert_type"])
-        
-        return {
-            "template_id": template_id,
-            "status": "created",
-            "template": template_data
-        }
-        
-    except Exception as e:
-        logger.error("Failed to create alert template", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Template creation failed: {str(e)}")
-
-
-@router.get("/status/{alert_id}")
-async def get_alert_status(alert_id: str) -> Dict[str, Any]:
-    """Get alert delivery status"""
-    try:
-        # In production, this would query from database or message queue
-        return {
-            "alert_id": alert_id,
-            "status": "delivered",
-            "created_at": datetime.utcnow().isoformat(),
-            "delivered_at": datetime.utcnow().isoformat(),
-            "delivery_details": {
-                "attempts": 1,
-                "last_attempt": datetime.utcnow().isoformat(),
-                "next_retry": None
-            }
-        }
-        
-    except Exception as e:
-        logger.error("Failed to get alert status", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
 
 
 async def dispatch_email_alerts(request: AlertRequest, alert_id: str) -> Dict[str, str]:
@@ -401,28 +355,37 @@ def generate_teams_message(event_data: Dict[str, Any], severity: str) -> Dict[st
 
 
 async def send_email_alert(recipient: str, subject: str, message: str, event_data: Dict[str, Any]):
-    """Send email alert (mock implementation)"""
-    # In production, this would use SMTP or email service like AWS SES, SendGrid, etc.
-    logger.info("Mock email sent", recipient=recipient, subject=subject)
-    return True
+    """Send an email through the configured HTTPS notification provider."""
+    return await _send_notification("email", {"recipient": recipient, "subject": subject, "message": message, "event_data": event_data})
 
 
 async def send_slack_alert(channel: str, message: Dict[str, Any], event_data: Dict[str, Any]):
-    """Send Slack alert (mock implementation)"""
-    # In production, this would use Slack Web API
-    logger.info("Mock Slack message sent", channel=channel)
-    return True
+    """Send Slack content through the configured HTTPS notification provider."""
+    return await _send_notification("slack", {"channel": channel, "message": message, "event_data": event_data})
 
 
 async def send_teams_alert(webhook_url: str, message: Dict[str, Any], event_data: Dict[str, Any]):
-    """Send Teams alert (mock implementation)"""
-    # In production, this would POST to Teams webhook URL
-    logger.info("Mock Teams message sent", webhook_url=webhook_url[-10:])
-    return True
+    """Send Teams content through the configured HTTPS notification provider."""
+    return await _send_notification("teams", {"target": webhook_url, "message": message, "event_data": event_data})
 
 
 async def send_webhook_alert(webhook_url: str, payload: Dict[str, Any]):
-    """Send webhook alert (mock implementation)"""
-    # In production, this would make HTTP POST request
-    logger.info("Mock webhook sent", webhook_url=webhook_url[-10:])
+    """Ask the configured provider to deliver a webhook."""
+    return await _send_notification("webhook", {"target": webhook_url, "payload": payload})
+
+
+async def _send_notification(kind: str, payload: Dict[str, Any]) -> bool:
+    url = os.getenv("ALERT_PROVIDER_URL", "")
+    token = os.getenv("ALERT_PROVIDER_TOKEN", "")
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc or len(token) < 16:
+        raise RuntimeError("HTTPS alert provider and token are not configured")
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.post(
+            f"{url.rstrip('/')}/v1/notifications/{kind}",
+            json=payload,
+            headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+        )
+    if response.status_code < 200 or response.status_code >= 300:
+        raise RuntimeError(f"Alert provider returned HTTP {response.status_code}")
     return True

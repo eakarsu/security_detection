@@ -196,7 +196,7 @@ export interface SandboxResult {
 }
 
 @Injectable()
-export class SandboxAnalysisNode extends SecurityNode {
+export class SandboxAnalysisNode extends SecurityNode<SandboxInput, SandboxConfig, SandboxResult> {
   id = 'sandbox-analysis';
   type = 'analysis';
   category = 'core' as const;

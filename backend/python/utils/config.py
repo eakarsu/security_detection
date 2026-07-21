@@ -2,99 +2,102 @@
 Configuration management for NodeGuard AI Security Platform
 """
 
-import os
 from typing import List, Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 
 class Settings(BaseSettings):
     """Application settings"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
     
     # Database Configuration
-    POSTGRES_HOST: str = Field(default="localhost", env="POSTGRES_HOST")
-    POSTGRES_PORT: int = Field(default=5432, env="POSTGRES_PORT")
-    POSTGRES_DB: str = Field(default="nodeguard", env="POSTGRES_DB")
-    POSTGRES_USER: str = Field(default="nodeguard", env="POSTGRES_USER")
-    POSTGRES_PASSWORD: str = Field(env="POSTGRES_PASSWORD")
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "nodeguard"
+    POSTGRES_USER: str = "nodeguard"
+    POSTGRES_PASSWORD: str = Field(min_length=1)
     
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
     # Redis Configuration
-    REDIS_URL: str = Field(default="redis://localhost:6379", env="REDIS_URL")
-    REDIS_PASSWORD: Optional[str] = Field(default=None, env="REDIS_PASSWORD")
+    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_PASSWORD: Optional[str] = None
     
     # Elasticsearch Configuration
-    ELASTICSEARCH_URL: str = Field(default="http://localhost:9200", env="ELASTICSEARCH_URL")
-    ELASTICSEARCH_USERNAME: Optional[str] = Field(default=None, env="ELASTICSEARCH_USERNAME")
-    ELASTICSEARCH_PASSWORD: Optional[str] = Field(default=None, env="ELASTICSEARCH_PASSWORD")
+    ELASTICSEARCH_URL: str = "http://localhost:9200"
+    ELASTICSEARCH_USERNAME: Optional[str] = None
+    ELASTICSEARCH_PASSWORD: Optional[str] = None
     
     # Kafka Configuration
-    KAFKA_BOOTSTRAP_SERVERS: str = Field(default="localhost:9092", env="KAFKA_BOOTSTRAP_SERVERS")
-    KAFKA_SECURITY_PROTOCOL: str = Field(default="PLAINTEXT", env="KAFKA_SECURITY_PROTOCOL")
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+    KAFKA_SECURITY_PROTOCOL: str = "PLAINTEXT"
     
     # OpenRouter API Configuration
-    OPENROUTER_API_KEY: str = Field(env="OPENROUTER_API_KEY")
-    OPENROUTER_BASE_URL: str = Field(default="https://openrouter.ai/api/v1", env="OPENROUTER_BASE_URL")
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
     
     # AI Model Configuration
-    DEFAULT_MODEL: str = Field(default="anthropic/claude-3.5-sonnet", env="DEFAULT_MODEL")
-    FALLBACK_MODEL: str = Field(default="openai/gpt-4-turbo", env="FALLBACK_MODEL")
-    MAX_TOKENS: int = Field(default=4096, env="MAX_TOKENS")
-    TEMPERATURE: float = Field(default=0.1, env="TEMPERATURE")
+    DEFAULT_MODEL: str = "anthropic/claude-3.5-sonnet"
+    FALLBACK_MODEL: str = "openai/gpt-4-turbo"
+    MAX_TOKENS: int = 4096
+    TEMPERATURE: float = 0.1
     
     # Background Task Configuration
-    ENABLE_THREAT_DETECTION_PIPELINE: bool = Field(default=False, env="ENABLE_THREAT_DETECTION_PIPELINE")
-    ENABLE_MODEL_TRAINING_SCHEDULER: bool = Field(default=False, env="ENABLE_MODEL_TRAINING_SCHEDULER")
-    THREAT_DETECTION_INTERVAL: int = Field(default=60, env="THREAT_DETECTION_INTERVAL")  # seconds
+    ENABLE_THREAT_DETECTION_PIPELINE: bool = False
+    ENABLE_MODEL_TRAINING_SCHEDULER: bool = False
+    THREAT_DETECTION_INTERVAL: int = 60
     
     # Security Configuration
-    JWT_SECRET: str = Field(env="JWT_SECRET")
-    JWT_EXPIRATION: str = Field(default="24h", env="JWT_EXPIRATION")
-    ENCRYPTION_KEY: str = Field(env="ENCRYPTION_KEY")
-    API_RATE_LIMIT: int = Field(default=1000, env="API_RATE_LIMIT")
+    JWT_SECRET: str = Field(min_length=32)
+    JWT_EXPIRATION: str = "24h"
+    ENCRYPTION_KEY: str = Field(min_length=16)
+    API_RATE_LIMIT: int = 1000
     
     # Application Configuration
-    NODE_ENV: str = Field(default="development", env="NODE_ENV")
-    LOG_LEVEL: str = Field(default="info", env="LOG_LEVEL")
-    API_PORT: int = Field(default=3001, env="API_PORT")
-    PYTHON_API_PORT: int = Field(default=8000, env="PYTHON_API_PORT")
-    FRONTEND_PORT: int = Field(default=3000, env="FRONTEND_PORT")
+    NODE_ENV: str = "development"
+    LOG_LEVEL: str = "info"
+    API_PORT: int = 3001
+    PYTHON_API_PORT: int = 8000
+    FRONTEND_PORT: int = 3000
     
     # External Services
-    THREAT_INTEL_API_KEY: Optional[str] = Field(default=None, env="THREAT_INTEL_API_KEY")
-    MITRE_API_ENDPOINT: str = Field(default="https://attack.mitre.org/api", env="MITRE_API_ENDPOINT")
-    VIRUSTOTAL_API_KEY: Optional[str] = Field(default=None, env="VIRUSTOTAL_API_KEY")
+    THREAT_INTEL_API_KEY: Optional[str] = None
+    MITRE_API_ENDPOINT: str = "https://attack.mitre.org/api"
+    VIRUSTOTAL_API_KEY: Optional[str] = None
     
     # Email Configuration
-    SMTP_HOST: str = Field(default="smtp.gmail.com", env="SMTP_HOST")
-    SMTP_PORT: int = Field(default=587, env="SMTP_PORT")
-    SMTP_USER: Optional[str] = Field(default=None, env="SMTP_USER")
-    SMTP_PASSWORD: Optional[str] = Field(default=None, env="SMTP_PASSWORD")
-    ALERT_EMAIL_FROM: str = Field(default="alerts@nodeguard.ai", env="ALERT_EMAIL_FROM")
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    ALERT_EMAIL_FROM: str = "alerts@nodeguard.ai"
     
     # Compliance Configuration
-    GDPR_ENABLED: bool = Field(default=True, env="GDPR_ENABLED")
-    HIPAA_ENABLED: bool = Field(default=False, env="HIPAA_ENABLED")
-    SOX_ENABLED: bool = Field(default=False, env="SOX_ENABLED")
-    AUDIT_RETENTION_DAYS: int = Field(default=2555, env="AUDIT_RETENTION_DAYS")  # 7 years
+    GDPR_ENABLED: bool = True
+    HIPAA_ENABLED: bool = False
+    SOX_ENABLED: bool = False
+    AUDIT_RETENTION_DAYS: int = 2555
     
     # Performance Configuration
-    MAX_CONCURRENT_REQUESTS: int = Field(default=100, env="MAX_CONCURRENT_REQUESTS")
-    CACHE_TTL: int = Field(default=3600, env="CACHE_TTL")  # 1 hour
-    ML_MODEL_CACHE_SIZE: int = Field(default=1000, env="ML_MODEL_CACHE_SIZE")
-    BATCH_SIZE: int = Field(default=1000, env="BATCH_SIZE")
+    MAX_CONCURRENT_REQUESTS: int = 100
+    CACHE_TTL: int = 3600
+    ML_MODEL_CACHE_SIZE: int = 1000
+    BATCH_SIZE: int = 1000
     
     # Development Configuration
-    DEBUG: bool = Field(default=False, env="DEBUG")
-    ENABLE_SWAGGER: bool = Field(default=True, env="ENABLE_SWAGGER")
-    ENABLE_CORS: bool = Field(default=True, env="ENABLE_CORS")
-    ALLOWED_ORIGINS: str = Field(
-        default="http://localhost:3000,http://localhost:3001",
-        env="ALLOWED_ORIGINS"
-    )
+    DEBUG: bool = False
+    ENABLE_SWAGGER: bool = True
+    ENABLE_CORS: bool = True
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
     
     @property
     def ALLOWED_ORIGINS_LIST(self) -> List[str]:
@@ -102,78 +105,36 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
     
     # ML Configuration
-    ML_MODEL_PATH: str = Field(default="./models", env="ML_MODEL_PATH")
-    ML_TRAINING_INTERVAL: int = Field(default=21600, env="ML_TRAINING_INTERVAL")  # 6 hours
-    ML_FEATURE_STORE_SIZE: int = Field(default=10000, env="ML_FEATURE_STORE_SIZE")
-    ML_ANOMALY_THRESHOLD: float = Field(default=0.7, env="ML_ANOMALY_THRESHOLD")
+    ML_MODEL_PATH: str = "./models"
+    ML_TRAINING_INTERVAL: int = 21600
+    ML_FEATURE_STORE_SIZE: int = 10000
+    ML_ANOMALY_THRESHOLD: float = 0.7
     
     # Monitoring Configuration
-    PROMETHEUS_ENABLED: bool = Field(default=True, env="PROMETHEUS_ENABLED")
-    METRICS_PORT: int = Field(default=9090, env="METRICS_PORT")
-    HEALTH_CHECK_INTERVAL: int = Field(default=30, env="HEALTH_CHECK_INTERVAL")
-    GRAFANA_PASSWORD: Optional[str] = Field(default=None, env="GRAFANA_PASSWORD")
-    PROMETHEUS_RETENTION: str = Field(default="15d", env="PROMETHEUS_RETENTION")
+    PROMETHEUS_ENABLED: bool = True
+    METRICS_PORT: int = 9090
+    HEALTH_CHECK_INTERVAL: int = 30
+    GRAFANA_PASSWORD: Optional[str] = None
+    PROMETHEUS_RETENTION: str = "15d"
     
     # Threat Detection Configuration
-    THREAT_SCORE_THRESHOLD: float = Field(default=0.7, env="THREAT_SCORE_THRESHOLD")
-    AUTO_RESPONSE_ENABLED: bool = Field(default=False, env="AUTO_RESPONSE_ENABLED")
-    QUARANTINE_ENABLED: bool = Field(default=True, env="QUARANTINE_ENABLED")
+    THREAT_SCORE_THRESHOLD: float = 0.7
+    AUTO_RESPONSE_ENABLED: bool = False
+    QUARANTINE_ENABLED: bool = True
     
     # Network Monitoring Configuration
-    NETWORK_INTERFACE: str = Field(default="eth0", env="NETWORK_INTERFACE")
-    PACKET_CAPTURE_ENABLED: bool = Field(default=True, env="PACKET_CAPTURE_ENABLED")
-    DEEP_PACKET_INSPECTION: bool = Field(default=True, env="DEEP_PACKET_INSPECTION")
+    NETWORK_INTERFACE: str = "eth0"
+    PACKET_CAPTURE_ENABLED: bool = True
+    DEEP_PACKET_INSPECTION: bool = True
     
     # Incident Response Configuration
-    INCIDENT_AUTO_ASSIGNMENT: bool = Field(default=True, env="INCIDENT_AUTO_ASSIGNMENT")
-    INCIDENT_SLA_HOURS: int = Field(default=4, env="INCIDENT_SLA_HOURS")
-    ESCALATION_ENABLED: bool = Field(default=True, env="ESCALATION_ENABLED")
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    INCIDENT_AUTO_ASSIGNMENT: bool = True
+    INCIDENT_SLA_HOURS: int = 4
+    ESCALATION_ENABLED: bool = True
 
 
 # Global settings instance
 settings = Settings()
-
-
-class LocalDevSettings:
-    """Local development mode settings - simplified configuration for testing without external dependencies"""
-    
-    # Check if we're in local development mode
-    LOCAL_DEV_MODE = os.getenv("LOCAL_DEV_MODE", "false").lower() == "true"
-    
-    # In-memory storage for local development
-    USE_IN_MEMORY_DB = LOCAL_DEV_MODE
-    USE_IN_MEMORY_CACHE = LOCAL_DEV_MODE
-    DISABLE_EXTERNAL_SERVICES = LOCAL_DEV_MODE
-    
-    # Mock external service responses
-    MOCK_OPENROUTER_RESPONSES = LOCAL_DEV_MODE
-    MOCK_THREAT_INTEL = LOCAL_DEV_MODE
-    MOCK_EMAIL_SENDING = LOCAL_DEV_MODE
-    
-    # Simplified ML models for local testing
-    USE_SIMPLE_ML_MODELS = LOCAL_DEV_MODE
-    SKIP_MODEL_TRAINING = LOCAL_DEV_MODE
-    
-    # Local development URLs
-    LOCAL_FRONTEND_URL = "http://localhost:3000"
-    LOCAL_NODEJS_API_URL = "http://localhost:3001"
-    LOCAL_PYTHON_API_URL = "http://localhost:8000"
-    
-    @classmethod
-    def get_effective_settings(cls):
-        """Get settings adjusted for local development mode"""
-        # For now, just return the original settings
-        # Local dev mode is handled in the application logic
-        return settings
-
-
-# Get effective settings based on mode
-effective_settings = LocalDevSettings.get_effective_settings()
 
 
 class SecurityConfig:

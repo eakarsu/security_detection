@@ -32,6 +32,10 @@ export class KafkaWorkflowTriggerService implements OnModuleInit, OnModuleDestro
   }
 
   async onModuleInit() {
+    if (process.env.ENABLE_BACKGROUND_JOBS === 'false') {
+      this.logger.log('Kafka workflow trigger disabled by runtime configuration');
+      return;
+    }
     await this.startListening();
   }
 

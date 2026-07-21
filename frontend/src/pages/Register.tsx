@@ -10,13 +10,9 @@ import {
   CircularProgress,
   Link,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
 } from '@mui/material';
 import { Security as SecurityIcon } from '@mui/icons-material';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth.tsx';
 
@@ -26,7 +22,6 @@ interface RegisterFormData {
   confirmPassword: string;
   first_name: string;
   last_name: string;
-  role: string;
 }
 
 const Register: React.FC = () => {
@@ -38,12 +33,9 @@ const Register: React.FC = () => {
   const {
     register,
     handleSubmit,
-    control,
     watch,
     formState: { errors },
-  } = useForm<RegisterFormData>({
-    defaultValues: { role: 'analyst' },
-  });
+  } = useForm<RegisterFormData>();
 
   const password = watch('password');
 
@@ -56,7 +48,6 @@ const Register: React.FC = () => {
         password: data.password,
         first_name: data.first_name,
         last_name: data.last_name,
-        role: data.role,
       });
       toast.success('Registration successful! Please check your email to verify your account.');
       navigate('/login');
@@ -127,26 +118,13 @@ const Register: React.FC = () => {
               error={!!errors.email}
               helperText={errors.email?.message}
             />
-            <Controller
-              name="role"
-              control={control}
-              render={({ field }) => (
-                <FormControl fullWidth>
-                  <InputLabel>Role</InputLabel>
-                  <Select {...field} label="Role">
-                    <MenuItem value="analyst">Security Analyst</MenuItem>
-                    <MenuItem value="viewer">Viewer</MenuItem>
-                  </Select>
-                </FormControl>
-              )}
-            />
             <TextField
               fullWidth
               label="Password"
               type="password"
               {...register('password', {
                 required: 'Password is required',
-                minLength: { value: 8, message: 'Password must be at least 8 characters' },
+                minLength: { value: 12, message: 'Password must be at least 12 characters' },
                 pattern: {
                   value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
                   message: 'Password must contain uppercase, lowercase, and a number',

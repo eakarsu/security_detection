@@ -25,7 +25,7 @@ export class AppController {
     return this.appService.getStatus();
   }
 
-  @Get('api/config')
+  @Get('config')
   @ApiOperation({ summary: 'Get runtime configuration for frontend' })
   @ApiResponse({ status: 200, description: 'Frontend configuration' })
   getConfig(): {

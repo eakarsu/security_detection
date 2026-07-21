@@ -11,7 +11,6 @@ from .ml import router as ml_router
 from .ai import router as ai_router
 from .correlation import router as correlation_router
 from .alerts import router as alerts_router
-from .response import router as response_router
 from .compliance import router as compliance_router
 from .threat_intel import router as threat_intel_router
 from .dashboard import router as dashboard_router
@@ -21,6 +20,7 @@ from .siem import router as siem_router
 from .threat_hunting import router as hunting_router
 from .advanced_detection import router as advanced_detection_router
 from .soc_analyst import router as soc_analyst_router
+from .investigation_cases import router as investigation_cases_router
 
 __all__ = [
     "detection_router",
@@ -29,7 +29,6 @@ __all__ = [
     "ai_router",
     "correlation_router",
     "alerts_router",
-    "response_router",
     "compliance_router",
     "threat_intel_router",
     "dashboard_router",
@@ -38,5 +37,6 @@ __all__ = [
     "siem_router",
     "hunting_router",
     "advanced_detection_router",
-    "soc_analyst_router"
+    "soc_analyst_router",
+    "investigation_cases_router",
 ]

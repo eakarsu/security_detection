@@ -286,7 +286,7 @@ Use this sample data to test the AI analysis:
    lsof -i :8000  # Python API
    
    # Kill processes if needed
-   kill -9 <PID>
+   Stop only the PID recorded by the launcher, using a normal `kill <PID>` first.
    ```
 
 ### Debug Mode

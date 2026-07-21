@@ -22,7 +22,6 @@ from api.routes import (
     ai_router,
     correlation_router,
     alerts_router,
-    response_router,
     compliance_router,
     threat_intel_router,
     dashboard_router,
@@ -31,7 +30,8 @@ from api.routes import (
     siem_router,
     hunting_router,
     advanced_detection_router,
-    soc_analyst_router
+    soc_analyst_router,
+    investigation_cases_router,
 )
 from api.middleware import SecurityMiddleware, LoggingMiddleware
 from api.services.database import DatabaseService
@@ -41,7 +41,7 @@ from api.services.ml_service import MLService
 from api.services.openrouter_service import OpenRouterService
 from api.services.elasticsearch_service import ElasticsearchService
 from api.services.threat_intel_loader import get_threat_intel, start_threat_intel_refresh_loop
-from utils.config import settings, LocalDevSettings, effective_settings
+from utils.config import settings
 from utils.logging_config import setup_logging
 
 # Setup structured logging
@@ -64,9 +64,6 @@ async def lifespan(app: FastAPI):
     
     logger.info("Starting NodeGuard AI Security Platform")
     
-    if LocalDevSettings.LOCAL_DEV_MODE:
-        logger.info("Running in LOCAL DEVELOPMENT MODE - simplified features")
-    
     try:
         # Initialize services with graceful fallbacks for local dev
         try:
@@ -75,8 +72,7 @@ async def lifespan(app: FastAPI):
             logger.info("Database service initialized")
         except Exception as e:
             logger.warning("Database service failed to initialize", error=str(e))
-            if not LocalDevSettings.LOCAL_DEV_MODE:
-                raise
+            raise
         
         try:
             cache_service = CacheService()
@@ -84,8 +80,7 @@ async def lifespan(app: FastAPI):
             logger.info("Cache service initialized")
         except Exception as e:
             logger.warning("Cache service failed to initialize", error=str(e))
-            if not LocalDevSettings.LOCAL_DEV_MODE:
-                raise
+            raise
         
         # Elasticsearch — always attempt, gracefully degrade when unavailable
         try:
@@ -103,19 +98,14 @@ async def lifespan(app: FastAPI):
             logger.warning("Elasticsearch service failed to initialize", error=str(e))
             es_service = None
 
-        # Only initialize Kafka if external services are enabled
-        if not LocalDevSettings.DISABLE_EXTERNAL_SERVICES:
+        if settings.ENABLE_THREAT_DETECTION_PIPELINE:
             try:
                 kafka_service = KafkaService(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
                 await kafka_service.initialize()
                 logger.info("Kafka service initialized")
             except Exception as e:
                 logger.warning("Kafka service failed to initialize", error=str(e))
-                if not LocalDevSettings.LOCAL_DEV_MODE:
-                    raise
-        else:
-            logger.info("Kafka service disabled (external services disabled for local development)")
-            kafka_service = None
+                raise
         
         try:
             ml_service = MLService()
@@ -123,8 +113,7 @@ async def lifespan(app: FastAPI):
             logger.info("ML service initialized")
         except Exception as e:
             logger.warning("ML service failed to initialize", error=str(e))
-            if not LocalDevSettings.LOCAL_DEV_MODE:
-                raise
+            ml_service = None
         
         try:
             openrouter_service = OpenRouterService()
@@ -132,8 +121,7 @@ async def lifespan(app: FastAPI):
             logger.info("OpenRouter service initialized")
         except Exception as e:
             logger.warning("OpenRouter service failed to initialize", error=str(e))
-            if not LocalDevSettings.LOCAL_DEV_MODE:
-                raise
+            openrouter_service = None
 
         # Initialize threat-intel loader and schedule periodic refresh
         try:
@@ -144,13 +132,11 @@ async def lifespan(app: FastAPI):
             logger.warning("Threat intel loader failed to initialize", error=str(e))
         
         # Background tasks controlled by environment variables
-        if (config.ENABLE_THREAT_DETECTION_PIPELINE and 
-            kafka_service and not LocalDevSettings.DISABLE_EXTERNAL_SERVICES):
+        if settings.ENABLE_THREAT_DETECTION_PIPELINE and kafka_service:
             asyncio.create_task(start_threat_detection_pipeline())
             logger.info("Threat detection pipeline enabled")
         
-        if (config.ENABLE_MODEL_TRAINING_SCHEDULER and 
-            ml_service and not LocalDevSettings.SKIP_MODEL_TRAINING):
+        if settings.ENABLE_MODEL_TRAINING_SCHEDULER and ml_service:
             asyncio.create_task(start_model_training_scheduler())
             logger.info("Model training scheduler enabled")
         
@@ -160,11 +146,7 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         logger.error("Failed to initialize services", error=str(e))
-        if not LocalDevSettings.LOCAL_DEV_MODE:
-            raise
-        else:
-            logger.info("Continuing in local development mode with limited functionality")
-            yield
+        raise
     finally:
         # Cleanup
         logger.info("Shutting down services")
@@ -210,11 +192,11 @@ app.mount("/metrics", metrics_app)
 # Include routers
 app.include_router(detection_router, prefix="/api/detection", tags=["Detection"])
 app.include_router(incidents_router, prefix="/api/incidents", tags=["Incidents"])
+app.include_router(investigation_cases_router, prefix="/api/investigation-cases", tags=["Investigation Cases"])
 app.include_router(ml_router, prefix="/api/ml", tags=["Machine Learning"])
 app.include_router(ai_router, prefix="/api/ai", tags=["AI Analysis"])
 app.include_router(correlation_router, prefix="/api/correlation", tags=["Event Correlation"])
 app.include_router(alerts_router, prefix="/api/alerts", tags=["Alert Management"])
-app.include_router(response_router, prefix="/api/response", tags=["Security Response"])
 app.include_router(compliance_router, prefix="/api/compliance", tags=["Compliance"])
 app.include_router(threat_intel_router, prefix="/api/threat-intel", tags=["Threat Intelligence"])
 app.include_router(dashboard_router, prefix="/api/dashboard", tags=["Dashboard"])
@@ -224,7 +206,6 @@ app.include_router(siem_router, prefix="/api/siem", tags=["SIEM"])
 app.include_router(hunting_router, prefix="/api/hunting", tags=["Threat Hunting"])
 app.include_router(advanced_detection_router, prefix="/api/advanced-detection", tags=["Advanced Detection"])
 app.include_router(soc_analyst_router, prefix="/api/soc-analyst", tags=["AI SOC Analyst"])
-app.include_router(__import__("api.routes.ai_extras", fromlist=["router"]).router, prefix="/api/ai-extras", tags=["AI Extras"])  # batch 11
 
 
 @app.get("/")
@@ -234,7 +215,7 @@ async def root():
         "message": "NodeGuard AI Security Platform",
         "version": "1.0.0",
         "status": "operational",
-        "mode": "local_development" if LocalDevSettings.LOCAL_DEV_MODE else "production",
+        "mode": settings.NODE_ENV,
         "services": {
             "database": "connected" if db_service and db_service.is_connected() else "disconnected",
             "cache": "connected" if cache_service and cache_service.is_connected() else "disconnected",
@@ -242,12 +223,6 @@ async def root():
             "ml_engine": "ready" if ml_service and ml_service.is_ready() else "not_ready",
             "ai_service": "ready" if openrouter_service and openrouter_service.is_ready() else "not_ready"
         },
-        "features": {
-            "external_services": not LocalDevSettings.DISABLE_EXTERNAL_SERVICES,
-            "ml_training": not LocalDevSettings.SKIP_MODEL_TRAINING,
-            "in_memory_storage": LocalDevSettings.USE_IN_MEMORY_DB,
-            "mock_responses": LocalDevSettings.MOCK_OPENROUTER_RESPONSES
-        } if LocalDevSettings.LOCAL_DEV_MODE else None
     }
 
 
@@ -298,7 +273,7 @@ async def start_threat_detection_pipeline():
             if kafka_service and kafka_service.is_connected():
                 await kafka_service.process_security_events()
             
-            await asyncio.sleep(config.THREAT_DETECTION_INTERVAL)  # Configurable interval
+            await asyncio.sleep(settings.THREAT_DETECTION_INTERVAL)  # Configurable interval
             
         except Exception as e:
             logger.error("Error in threat detection pipeline", error=str(e))

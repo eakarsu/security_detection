@@ -80,6 +80,8 @@ class OpenRouterService:
     async def initialize(self):
         """Initialize the OpenRouter service"""
         try:
+            if not self.api_key or len(self.api_key) < 16:
+                raise RuntimeError("OPENROUTER_API_KEY is not configured")
             self.client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers={

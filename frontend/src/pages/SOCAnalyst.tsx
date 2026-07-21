@@ -16,13 +16,11 @@ import {
   InputLabel,
   Tooltip,
   CircularProgress,
-  Alert,
   List,
   ListItem,
   ListItemIcon,
   ListItemText,
   Collapse,
-  Badge,
 } from '@mui/material';
 import {
   Send as SendIcon,

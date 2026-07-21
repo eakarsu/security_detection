@@ -29,7 +29,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [localValue, debounceMs]);
+  }, [localValue, debounceMs, onChange, value]);
 
   const handleClear = useCallback(() => {
     setLocalValue('');

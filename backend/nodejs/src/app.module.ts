@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { SecurityModule } from './security/security.module';
 import { WorkflowModule } from './workflow/workflow.module';
+import { requiredEnv } from './config/required-env';
 
 @Module({
   imports: [
@@ -18,10 +19,10 @@ import { WorkflowModule } from './workflow/workflow.module';
       host: process.env.POSTGRES_HOST || process.env.DB_HOST || 'postgres',
       port: parseInt(process.env.POSTGRES_PORT || process.env.DB_PORT || '5432'),
       username: process.env.POSTGRES_USER || process.env.DB_USER || 'nodeguard',
-      password: process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD || 'NodeGuard2025!SecureDB',
+      password: process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD || requiredEnv('POSTGRES_PASSWORD'),
       database: process.env.POSTGRES_DB || process.env.DB_NAME || 'nodeguard',
       autoLoadEntities: true,
-      synchronize: process.env.NODE_ENV !== 'production',
+      synchronize: false,
       logging: process.env.NODE_ENV === 'development',
       retryAttempts: 10,
       retryDelay: 3000,

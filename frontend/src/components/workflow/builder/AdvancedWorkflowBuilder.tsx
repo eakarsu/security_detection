@@ -15,6 +15,7 @@ import ReactFlow, {
   OnNodesChange,
   OnEdgesChange,
   OnInit,
+  BackgroundVariant,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -564,7 +565,7 @@ export const AdvancedWorkflowBuilder: React.FC<AdvancedWorkflowBuilderProps> = (
               )}
               
               <Background 
-                variant={showGrid ? 'dots' : 'lines'}
+                variant={showGrid ? BackgroundVariant.Dots : BackgroundVariant.Lines}
                 gap={20}
                 size={showGrid ? 2 : 1}
                 color={showGrid ? '#3b82f6' : '#e2e8f0'}

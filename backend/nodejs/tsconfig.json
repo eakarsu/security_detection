@@ -24,6 +24,8 @@
     "noUnusedParameters": false
   },
   "exclude": [
+    "dist",
+    "node_modules",
     "**/*.spec.ts",
     "**/*.test.ts",
     "test/**/*",

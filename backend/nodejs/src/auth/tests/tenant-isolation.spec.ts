@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { TenantDataService } from '../services/tenant-data.service';
 import { TenantWorkflowRepository } from '../../workflow/repositories/tenant-workflow.repository';
 import { TenantThreatIntelRepository } from '../../workflow/repositories/tenant-threat-intel.repository';
@@ -14,8 +14,11 @@ describe('TenantIsolationSystem', () => {
   let tenantThreatIntelRepo: TenantThreatIntelRepository;
   let mockRequest: any;
   let mockDataSource: Partial<DataSource>;
-  let mockWorkflowRepository: Partial<Repository<Workflow>>;
-  let mockThreatIntelRepository: Partial<Repository<ThreatIntelligence>>;
+  // These are deliberately structural Jest doubles, not complete TypeORM
+  // Repository instances. Keep their type honest so TypeORM metadata additions
+  // do not make the test fixture itself fail compilation.
+  let mockWorkflowRepository: any;
+  let mockThreatIntelRepository: any;
 
   beforeEach(async () => {
     // Mock request with tenant context
@@ -94,6 +97,23 @@ describe('TenantIsolationSystem', () => {
       }
     };
 
+    // TypeORM's Repository base class delegates through EntityManager. Provide
+    // that narrow delegation surface so the custom repositories exercise their
+    // real tenant logic while persistence remains a Jest double.
+    (mockWorkflowRepository as any).manager = {
+      connection: { getMetadata: jest.fn(() => mockWorkflowRepository.metadata) },
+      createQueryBuilder: jest.fn((...args: any[]) => mockWorkflowRepository.createQueryBuilder(...args)),
+      save: jest.fn((_target: any, entity: any) => mockWorkflowRepository.save(entity)),
+    };
+    (mockThreatIntelRepository as any).manager = {
+      connection: { getMetadata: jest.fn(() => mockThreatIntelRepository.metadata) },
+      createQueryBuilder: jest.fn((...args: any[]) => mockThreatIntelRepository.createQueryBuilder(...args)),
+      save: jest.fn((_target: any, entity: any) => mockThreatIntelRepository.save(entity)),
+    };
+    (mockDataSource.getRepository as jest.Mock).mockImplementation((entity) =>
+      entity === Workflow ? mockWorkflowRepository : mockThreatIntelRepository
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TenantDataService,
@@ -118,9 +138,9 @@ describe('TenantIsolationSystem', () => {
       ]
     }).compile();
 
-    tenantDataService = module.get<TenantDataService>(TenantDataService);
-    tenantWorkflowRepo = module.get<TenantWorkflowRepository>(TenantWorkflowRepository);
-    tenantThreatIntelRepo = module.get<TenantThreatIntelRepository>(TenantThreatIntelRepository);
+    tenantDataService = await module.resolve<TenantDataService>(TenantDataService);
+    tenantWorkflowRepo = await module.resolve<TenantWorkflowRepository>(TenantWorkflowRepository);
+    tenantThreatIntelRepo = await module.resolve<TenantThreatIntelRepository>(TenantThreatIntelRepository);
   });
 
   describe('TenantDataService', () => {

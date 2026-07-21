@@ -10,14 +10,19 @@ import { EmailService } from './email.service';
 import { User } from './entities/user.entity';
 import { Tenant } from './entities/tenant.entity';
 import { TenantSettings } from './entities/tenant-settings.entity';
+import { jwtSecret } from '../config/required-env';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Tenant, TenantSettings]),
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'nodeguard-secret-key',
-      signOptions: { expiresIn: '24h' },
+      secret: jwtSecret(),
+      signOptions: {
+        expiresIn: '24h',
+        issuer: process.env.JWT_ISSUER || 'nodeguard-auth',
+        audience: process.env.JWT_AUDIENCE || 'nodeguard-api',
+      },
     }),
   ],
   controllers: [AuthController],

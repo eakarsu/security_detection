@@ -1,21 +1,11 @@
 -- NodeGuard AI Security Platform - Comprehensive Seed Data
--- Seeds 15+ items per entity for full demo experience
+-- Optional non-production fixtures for local evaluation.
+-- This script deliberately creates no user accounts or credentials.
 
 BEGIN;
 
 -- ============================================
--- 1. ADDITIONAL USERS (5 more, total ~7)
--- ============================================
-INSERT INTO users (email, password_hash, first_name, last_name, role) VALUES
-('viewer@nodeguard.ai', crypt('viewer123', gen_salt('bf')), 'View', 'Only', 'viewer'),
-('analyst2@nodeguard.ai', crypt('analyst123', gen_salt('bf')), 'Jane', 'Smith', 'analyst'),
-('manager@nodeguard.ai', crypt('manager123', gen_salt('bf')), 'Robert', 'Johnson', 'admin'),
-('soc@nodeguard.ai', crypt('soc12345', gen_salt('bf')), 'Sarah', 'Williams', 'analyst'),
-('ciso@nodeguard.ai', crypt('ciso1234', gen_salt('bf')), 'Michael', 'Chen', 'admin')
-ON CONFLICT (email) DO NOTHING;
-
--- ============================================
--- 2. THREAT INTELLIGENCE (25+ total)
+-- 1. THREAT INTELLIGENCE (25+ total)
 -- ============================================
 -- Clear duplicates first
 DELETE FROM security.threat_intel WHERE indicator_value IN (
