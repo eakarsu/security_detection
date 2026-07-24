@@ -28,7 +28,7 @@ const Login: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const {
-    register,
+    register, setValue,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
@@ -108,6 +108,15 @@ const Login: React.FC = () => {
               helperText={errors.password?.message}
               autoComplete="current-password"
             />
+            <button
+              type="button"
+              onClick={() => { setValue('email', import.meta.env.VITE_DEMO_EMAIL || ''); setValue('password', import.meta.env.VITE_DEMO_PASSWORD || ''); }}
+              disabled={!import.meta.env.VITE_DEMO_EMAIL || !import.meta.env.VITE_DEMO_PASSWORD}
+              aria-label="Auto Fill Demo Credentials"
+              style={{ width: '100%', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid currentColor', background: 'transparent', cursor: 'pointer' }}
+            >
+              Auto Fill Demo Credentials
+            </button>
             <Button
               type="submit"
               fullWidth
