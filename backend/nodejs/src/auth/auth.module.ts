@@ -11,6 +11,7 @@ import { User } from './entities/user.entity';
 import { Tenant } from './entities/tenant.entity';
 import { TenantSettings } from './entities/tenant-settings.entity';
 import { jwtSecret } from '../config/required-env';
+import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { jwtSecret } from '../config/required-env';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, EmailService],
-  exports: [AuthService],
+  providers: [AuthService, JwtStrategy, LocalStrategy, EmailService, JwtAuthGuard],
+  exports: [AuthService, JwtAuthGuard],
 })
 export class AuthModule {}

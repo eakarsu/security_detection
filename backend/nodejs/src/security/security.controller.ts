@@ -1,5 +1,5 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
-import { IsArray, IsIP, IsNumber, IsObject, IsOptional, IsString, Max, Min, ArrayMaxSize } from 'class-validator';
+import { Controller, Post, Body, UseGuards, Request } from '@nestjs/common';
+import { IsArray, IsIP, IsNumber, IsObject, IsOptional, IsString, Max, Min, ArrayMaxSize, MaxLength, MinLength } from 'class-validator';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { SecurityService } from './security.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -17,6 +17,10 @@ export class SecurityEventInput {
   @IsArray() @ArrayMaxSize(50) recentAlerts: unknown[];
 }
 
+export class RuntimeAdviceInput {
+  @IsString() @MinLength(1) @MaxLength(4000) prompt: string;
+}
+
 @ApiTags('Security')
 @Controller('security')
 @UseGuards(JwtAuthGuard)
@@ -29,5 +33,11 @@ export class SecurityController {
   @ApiResponse({ status: 200, description: 'Security event analyzed successfully' })
   async analyzeEvent(@Body() event: SecurityEventInput) {
     return this.securityService.analyzeSecurityEvent(event);
+  }
+
+  @Post('runtime-advice')
+  @ApiOperation({ summary: 'Generate bounded analyst guidance with a durable provider receipt' })
+  async runtimeAdvice(@Request() req, @Body() input: RuntimeAdviceInput) {
+    return this.securityService.runtimeAdvice(input.prompt.trim(), req.user.userId);
   }
 }

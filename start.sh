@@ -8,7 +8,8 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_DIR="${RUNTIME_PROJECT_SOURCE:-$PROJECT_DIR}"
-: "${PORT:?PORT is required; choose an unused API port explicitly}"
+if [[ -f "$PROJECT_DIR/.env" ]]; then set -a; source "$PROJECT_DIR/.env"; set +a; fi
+: "${BACKEND_PORT:?BACKEND_PORT is required; choose an unused API port explicitly}"
 : "${FRONTEND_PORT:?FRONTEND_PORT is required; choose an unused UI port explicitly}"
 : "${DATABASE_URL:?DATABASE_URL is required}"
 : "${JWT_SECRET:?JWT_SECRET is required}"
@@ -38,6 +39,8 @@ done
   exit 1
 }
 
+PORT="$BACKEND_PORT"
+export PORT
 for port in "$PORT" "$FRONTEND_PORT"; do
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "Port $port is already occupied; refusing to terminate its process." >&2

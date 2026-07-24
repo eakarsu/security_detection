@@ -43,4 +43,8 @@ export class SecurityService {
       },
     };
   }
+
+  async runtimeAdvice(prompt: string, userId: string) {
+    return this.openRouterService.runtimeAdvice(prompt, userId);
+  }
 }
